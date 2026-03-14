@@ -14,14 +14,14 @@ const getShiprocketToken = async () => {
         const response = await axios.post(`${SHIPROCKET_API_BASE}/auth/login`, {
             email: process.env.SHIPROCKET_EMAIL,
             password: process.env.SHIPROCKET_PASSWORD,
-        });
+        }, { timeout: 5000 });
 
         shiprocketToken = response.data.token;
         // Token roughly expires in 10 days; we set it to 9 days to be safe
         tokenExpiry = Date.now() + (9 * 24 * 60 * 60 * 1000);
         return shiprocketToken;
     } catch (error) {
-        console.error("Error authenticating with Shiprocket:", error.response ? error.response.data : error.message);
+        console.error("Error authenticating with Shiprocket (Timeout or Auth Failure)", error.message);
         throw new Error("Shiprocket Authentication failed");
     }
 };
@@ -69,7 +69,8 @@ const createShiprocketOrder = async (orderDetails) => {
         const response = await axios.post(`${SHIPROCKET_API_BASE}/orders/create/adHoc`, payload, {
             headers: {
                 Authorization: `Bearer ${token}`
-            }
+            },
+            timeout: 5000
         });
 
         return response.data;
