@@ -2,6 +2,11 @@ const nodemailer = require("nodemailer");
 
 const sendEmail = async (options) => {
     try {
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.log("Email credentials not set. Skipping email sending.");
+            return true;
+        }
+
         const transporter = nodemailer.createTransport({
             service: "Gmail", // Or another service provider like SendGrid, Mailgun
             auth: {
