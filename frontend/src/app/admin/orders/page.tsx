@@ -43,8 +43,9 @@ export default function AdminOrdersPage() {
                 window.open(data.label_url, '_blank');
                 setPrintedLabels(prev => ({ ...prev, [id]: true }));
             }
-        } catch (error) {
-            alert("Failed to generate label or order hasn't been assigned an AWB yet.");
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || "Failed to generate label or order hasn't been assigned an AWB yet.";
+            alert(`Shiprocket Error: ${errorMsg}`);
         }
     };
 

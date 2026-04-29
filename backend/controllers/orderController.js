@@ -270,14 +270,14 @@ const generateShiprocketLabel = async (req, res) => {
             if (labelRes && labelRes.label_created) {
                 res.json({ label_url: labelRes.label_url });
             } else {
-                res.status(400).json({ message: "Label generation failed" });
+                res.status(400).json({ message: labelRes?.message || "Shiprocket refused to create label. It might still be processing the AWB in the background." });
             }
         } else {
             res.status(404).json({ message: "Order not found" });
         }
     } catch (error) {
         console.error("DEBUG LABEL ERROR: ", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+        res.status(500).json({ message: error.response?.data?.message || error.message || "Failed to generate label." });
     }
 };
 
