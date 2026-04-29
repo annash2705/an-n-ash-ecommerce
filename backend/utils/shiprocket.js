@@ -115,25 +115,16 @@ const processShiprocketFulfillment = async (order) => {
             }
 
             return {
-                shiprocketOrderId: srOrder.order_id || "mock_order_123",
-                shipmentId: srOrder.shipment_id || "mock_shipment_123",
-                trackingId: trackingId || "MOCKAWB12345"
+                shiprocketOrderId: srOrder.order_id,
+                shipmentId: srOrder.shipment_id,
+                trackingId: trackingId
             };
         }
 
-        // Simulating success if Shiprocket returns null
-        return {
-            shiprocketOrderId: "mock_order_123",
-            shipmentId: "mock_shipment_456",
-            trackingId: "MOCKAWB98765"
-        };
+        throw new Error("Shiprocket fulfillment failed. No shipment ID returned.");
     } catch (error) {
-        console.error("Shiprocket fulfillment error (Simulating Success):", error.message);
-        return {
-            shiprocketOrderId: "mock_order_123",
-            shipmentId: "mock_shipment_456",
-            trackingId: "MOCKAWB98765"
-        };
+        console.error("Shiprocket fulfillment error:", error.message);
+        throw error;
     }
 };
 
@@ -149,12 +140,8 @@ const generateLabel = async (shipmentIds) => {
         });
         return response.data;
     } catch (error) {
-        console.error("Error generating Label (Simulating Success):", error.message);
-        // Return a mock label URL so testing can proceed
-        return {
-            label_created: 1,
-            label_url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
-        };
+        console.error("Error generating Label:", error.message);
+        throw error;
     }
 };
 

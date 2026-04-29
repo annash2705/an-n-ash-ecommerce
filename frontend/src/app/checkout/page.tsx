@@ -47,16 +47,9 @@ export default function CheckoutPage() {
             if (paymentMethod === "Razorpay") {
                 const { data: clientId } = await api.get("/config/razorpay");
 
-                // If running locally without a real Razorpay key, dynamically mock the payment flow
+                // Enforce live or test Razorpay key configuration
                 if (!clientId || clientId.includes("your_razorpay")) {
-                    alert("Simulating Razorpay Payment Flow (No real config keys found). Payment Success!");
-                    await api.post(`/orders/${data._id}/verify`, {
-                        razorpay_order_id: "mock_rzp_order_id",
-                        razorpay_payment_id: "mock_rzp_payment_id",
-                        razorpay_signature: "mock_rzp_signature"
-                    });
-                    clearCart();
-                    router.push(`/order/${data._id}`);
+                    alert("Razorpay integration is incomplete. Please setup RAZORPAY_KEY_ID in your environment.");
                     setLoading(false);
                     return;
                 }

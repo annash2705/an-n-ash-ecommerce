@@ -3,8 +3,7 @@ const nodemailer = require("nodemailer");
 const sendEmail = async (options) => {
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.log("Email credentials not set. Skipping email sending.");
-            return true;
+            throw new Error("Email credentials not set. Cannot send email.");
         }
 
         const transporter = nodemailer.createTransport({
@@ -26,8 +25,8 @@ const sendEmail = async (options) => {
         console.log(`Email sent: ${info.response}`);
         return true;
     } catch (error) {
-        console.error(`Error sending email (Simulating Success for Testing): ${error.message}`);
-        return false;
+        console.error(`Error sending email: ${error.message}`);
+        throw error;
     }
 };
 

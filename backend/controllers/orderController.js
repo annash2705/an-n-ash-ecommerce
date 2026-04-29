@@ -116,7 +116,7 @@ const verifyRazorpayPayment = async (req, res) => {
             .update(body.toString())
             .digest("hex");
 
-        const isAuthentic = expectedSignature === razorpay_signature || razorpay_payment_id === "mock_rzp_payment_id";
+        const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
             const order = await Order.findById(req.params.id);
@@ -129,16 +129,26 @@ const verifyRazorpayPayment = async (req, res) => {
                     update_time: Date.now().toString()
                 };
 
-                // Trigger Shiprocket fulfillment for Prepaid orders
-                const fulfillment = await processShiprocketFulfillment(order);
-                if (fulfillment) {
-                    if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
-                    if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
-                    if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                try {
+                    // Trigger Shiprocket fulfillment for Prepaid orders
+                    const fulfillment = await processShiprocketFulfillment(order);
+                    if (fulfillment) {
+                        if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
+                        if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
+                        if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                    }
+                } catch (shiprocketErr) {
+                    console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
                 }
 
                 const updatedOrder = await order.save();
-                await sendOrderConfirmationEmail(req.user.email, order._id, order.totalPrice);
+
+                try {
+                    await sendOrderConfirmationEmail(req.user.email, order._id, order.totalPrice);
+                } catch (emailErr) {
+                    console.error("Email API failed during verification, but payment was captured:", emailErr.message);
+                }
+                
                 res.json(updatedOrder);
             } else {
                 res.status(404).json({ message: "Order not found" });
@@ -238,8 +248,10 @@ const generateShiprocketLabel = async (req, res) => {
     try {
         const order = await Order.findById(req.params.id);
         if (order) {
-            // If the order has no shipmentId (old order or mock simulation missing env keys), pass a dummy ID
-            const activeShipmentId = order.shipmentId || "mock_shipment_id_for_testing";
+            if (!order.shipmentId) {
+                return res.status(400).json({ message: "No active shipment ID for this order." });
+            }
+            const activeShipmentId = order.shipmentId;
             const labelRes = await generateLabel([activeShipmentId]);
 
             if (labelRes && labelRes.label_created) {
