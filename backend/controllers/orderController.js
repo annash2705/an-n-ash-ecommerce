@@ -56,7 +56,9 @@ const addOrderItems = async (req, res) => {
                 }
 
                 try {
-                    await sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice);
+                    sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice).catch(emailErr => {
+                        console.error("Email API failed internally.", emailErr.message);
+                    });
                 } catch (emailErr) {
                     console.error("Email API failed during COD, but order is saved.", emailErr.message);
                 }
@@ -153,7 +155,9 @@ const verifyRazorpayPayment = async (req, res) => {
                 const updatedOrder = await order.save();
 
                 try {
-                    await sendOrderConfirmationEmail(req.user.email, order._id, order.totalPrice);
+                    sendOrderConfirmationEmail(req.user.email, order._id, order.totalPrice).catch(emailErr => {
+                        console.error("Email API failed internally.", emailErr.message);
+                    });
                 } catch (emailErr) {
                     console.error("Email API failed during verification, but payment was captured:", emailErr.message);
                 }
