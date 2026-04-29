@@ -66,7 +66,7 @@ const createShiprocketOrder = async (orderDetails) => {
             weight: 0.5
         };
 
-        const response = await axios.post(`${SHIPROCKET_API_BASE}/orders/create/adHoc`, payload, {
+        const response = await axios.post(`${SHIPROCKET_API_BASE}/orders/create/adhoc`, payload, {
             headers: {
                 Authorization: `Bearer ${token}`
             },

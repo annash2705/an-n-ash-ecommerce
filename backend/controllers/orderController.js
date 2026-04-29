@@ -43,14 +43,23 @@ const addOrderItems = async (req, res) => {
 
             // If Cash on Delivery, trigger Shiprocket immediately since it's confirmed
             if (paymentMethod === "Cash on Delivery") {
-                const fulfillment = await processShiprocketFulfillment(createdOrder);
-                if (fulfillment) {
-                    if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
-                    if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
-                    if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                    await createdOrder.save();
+                try {
+                    const fulfillment = await processShiprocketFulfillment(createdOrder);
+                    if (fulfillment) {
+                        if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
+                        if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
+                        if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                        await createdOrder.save();
+                    }
+                } catch (srErr) {
+                    console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
                 }
-                await sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice);
+
+                try {
+                    await sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice);
+                } catch (emailErr) {
+                    console.error("Email API failed during COD, but order is saved.", emailErr.message);
+                }
             }
 
             res.status(201).json(createdOrder);
