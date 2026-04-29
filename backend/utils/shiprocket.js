@@ -104,6 +104,9 @@ const processShiprocketFulfillment = async (order) => {
         console.log(`Processing Shiprocket fulfillment for order ${order._id}`);
         // 1. Create Order in Shiprocket
         const srOrder = await createShiprocketOrder(order);
+        
+        console.log("SHIPROCKET API RAW RESPONSE:");
+        console.log(JSON.stringify(srOrder, null, 2));
 
         if (srOrder && srOrder.shipment_id) {
             // 2. Assign AWB (Auto-generate shipping label tracking)
