@@ -59,7 +59,7 @@ const createShiprocketOrder = async (orderDetails) => {
             giftwrap_charges: 0,
             transaction_charges: 0,
             total_discount: 0,
-            sub_total: orderDetails.totalPrice,
+            sub_total: orderDetails.itemsPrice,
             length: 10,
             breadth: 10,
             height: 10,
