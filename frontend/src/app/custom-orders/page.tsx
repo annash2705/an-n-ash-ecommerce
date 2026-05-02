@@ -31,7 +31,7 @@ export default function CustomOrdersPage() {
                 // Upload image if provided
                 const uploadData = new FormData();
                 uploadData.append("image", file);
-                const { data: uploadRes } = await api.post("/upload", uploadData, {
+                const { data: uploadRes } = await api.post("/upload/public", uploadData, {
                     headers: { "Content-Type": "multipart/form-data" }
                 });
                 imageBlob = uploadRes;

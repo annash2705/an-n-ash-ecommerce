@@ -44,8 +44,8 @@ export default function AdminOrdersPage() {
                 setPrintedLabels(prev => ({ ...prev, [id]: true }));
             }
         } catch (error: any) {
-            const errorMsg = error.response?.data?.message || "Failed to generate label or order hasn't been assigned an AWB yet.";
-            alert(`Shiprocket Error: ${errorMsg}`);
+            const errorMsg = error.response?.data?.message || "Failed to generate label. The order may not have a Shiprocket shipment yet.";
+            alert(errorMsg);
         }
     };
 
@@ -60,6 +60,35 @@ export default function AdminOrdersPage() {
             ? !['delivered', 'cancelled'].includes(order.orderStatus)
             : ['delivered', 'cancelled'].includes(order.orderStatus)
     );
+
+    // Determine what action button to show
+    const getActionButton = (order: any) => {
+        // For Razorpay orders that haven't been paid yet — don't show print label
+        if (order.paymentMethod === "Razorpay" && !order.isPaid) {
+            return <span className="text-xs text-gray-400 italic">Awaiting payment</span>;
+        }
+
+        // No shipment ID — can't print label (old order or Shiprocket failed)
+        if (!order.shipmentId) {
+            return <span className="text-xs text-gray-400 italic">No shipment</span>;
+        }
+
+        // Label already printed this session
+        if (printedLabels[order._id]) {
+            return (
+                <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" onClick={() => handleMarkPickedUp(order._id)}>
+                    Mark Picked Up
+                </Button>
+            );
+        }
+
+        // Default: show print label
+        return (
+            <Button variant="outline" size="sm" onClick={() => handlePrintLabel(order._id)}>
+                Print Label
+            </Button>
+        );
+    };
 
     return (
         <div>
@@ -97,6 +126,7 @@ export default function AdminOrdersPage() {
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">USER</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">DATE</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">TOTAL</th>
+                                    <th className="py-3 px-4 text-sm font-semibold text-foreground">METHOD</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">PAID</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">STATUS</th>
                                     {activeTab === 'pending' && <th className="py-3 px-4 text-sm font-semibold text-foreground text-right">ACTION</th>}
@@ -105,7 +135,7 @@ export default function AdminOrdersPage() {
                             <tbody>
                                 {displayedOrders.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="text-center py-10 text-gray-400">No {activeTab} orders found.</td>
+                                        <td colSpan={8} className="text-center py-10 text-gray-400">No {activeTab} orders found.</td>
                                     </tr>
                                 ) : displayedOrders.map((order: any) => (
                                     <tr key={order._id} className="border-b border-beige last:border-b-0 hover:bg-gray-50">
@@ -114,8 +144,13 @@ export default function AdminOrdersPage() {
                                         <td className="py-4 px-4 text-sm text-foreground">{new Date(order.createdAt).toLocaleDateString()}</td>
                                         <td className="py-4 px-4 text-sm text-foreground">₹{order.totalPrice}</td>
                                         <td className="py-4 px-4 text-sm">
-                                            <span className={order.isPaid ? 'text-green-600' : 'text-red-500'}>
-                                                {order.isPaid ? 'Yes' : 'No'}
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${order.paymentMethod === 'Cash on Delivery' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
+                                                {order.paymentMethod === 'Cash on Delivery' ? 'COD' : 'Prepaid'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4 text-sm">
+                                            <span className={order.isPaid ? 'text-green-600 font-medium' : 'text-red-500'}>
+                                                {order.isPaid ? '✓ Paid' : 'Unpaid'}
                                             </span>
                                         </td>
                                         <td className="py-4 px-4 text-sm">
@@ -141,16 +176,8 @@ export default function AdminOrdersPage() {
                                             )}
                                         </td>
                                         {activeTab === 'pending' && (
-                                            <td className="py-4 px-4 text-sm text-right space-x-2">
-                                                {!printedLabels[order._id] ? (
-                                                    <Button variant="outline" size="sm" onClick={() => handlePrintLabel(order._id)}>
-                                                        Print Label
-                                                    </Button>
-                                                ) : (
-                                                    <Button className="bg-green-600 hover:bg-green-700 text-white" size="sm" onClick={() => handleMarkPickedUp(order._id)}>
-                                                        Mark Picked Up
-                                                    </Button>
-                                                )}
+                                            <td className="py-4 px-4 text-sm text-right">
+                                                {getActionButton(order)}
                                             </td>
                                         )}
                                     </tr>

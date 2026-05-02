@@ -3,7 +3,7 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
 const router = express.Router();
-const { protect } = require("../middlewares/authMiddleware");
+const { protect, optionalAuth } = require("../middlewares/authMiddleware");
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -26,7 +26,23 @@ const upload = multer({
     },
 });
 
+// Protected upload (for admin product images)
 router.post("/", protect, upload.single("image"), (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: "No image provided" });
+        }
+        res.json({
+            url: req.file.path,
+            public_id: req.file.filename,
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Image upload failed", error: error.message });
+    }
+});
+
+// Public upload (for custom order reference images — no login required)
+router.post("/public", upload.single("image"), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: "No image provided" });
