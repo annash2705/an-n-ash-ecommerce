@@ -16,7 +16,7 @@ export default function AdminProductsPage() {
     const fetchProducts = async () => {
         try {
             const { data } = await api.get("/products");
-            setProducts(data);
+            setProducts(data.products || data);
         } catch (error) {
             console.log("Error fetching products");
         } finally {
