@@ -19,6 +19,7 @@ export default function CheckoutPage() {
 
     const [paymentMethod, setPaymentMethod] = useState("Razorpay");
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!user) {
@@ -28,9 +29,42 @@ export default function CheckoutPage() {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setAddress({ ...address, [e.target.name]: e.target.value });
+        // Clear error for this field when user types
+        if (errors[e.target.name]) {
+            setErrors({ ...errors, [e.target.name]: "" });
+        }
+    };
+
+    const validateForm = (): boolean => {
+        const newErrors: Record<string, string> = {};
+
+        if (!address.name.trim()) newErrors.name = "Full name is required";
+        if (!address.phone.trim()) {
+            newErrors.phone = "Phone number is required";
+        } else if (!/^[6-9]\d{9}$/.test(address.phone.trim())) {
+            newErrors.phone = "Enter a valid 10-digit Indian phone number";
+        }
+        if (!address.email.trim()) {
+            newErrors.email = "Email is required";
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address.email.trim())) {
+            newErrors.email = "Enter a valid email address";
+        }
+        if (!address.street.trim()) newErrors.street = "Street address is required";
+        if (!address.city.trim()) newErrors.city = "City is required";
+        if (!address.state.trim()) newErrors.state = "State is required";
+        if (!address.pincode.trim()) {
+            newErrors.pincode = "Pincode is required";
+        } else if (!/^\d{6}$/.test(address.pincode.trim())) {
+            newErrors.pincode = "Enter a valid 6-digit pincode";
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
     };
 
     const placeOrderHandler = async () => {
+        if (!validateForm()) return;
+
         setLoading(true);
         try {
             const orderData = {
@@ -47,7 +81,6 @@ export default function CheckoutPage() {
             if (paymentMethod === "Razorpay") {
                 const { data: clientId } = await api.get("/config/razorpay");
 
-                // Enforce live or test Razorpay key configuration
                 if (!clientId || clientId.includes("your_razorpay")) {
                     alert("Razorpay integration is incomplete. Please setup RAZORPAY_KEY_ID in your environment.");
                     setLoading(false);
@@ -93,14 +126,17 @@ export default function CheckoutPage() {
                 router.push(`/order/${data._id}`);
             }
 
-        } catch (error) {
-            alert("Error placing order. Please try again.");
+        } catch (error: any) {
+            alert(error.response?.data?.message || "Error placing order. Please try again.");
         } finally {
             setLoading(false);
         }
     };
 
     if (!user) return null;
+
+    const inputClass = (field: string) =>
+        `w-full border ${errors[field] ? 'border-red-400' : 'border-beige'} rounded-sm p-2 text-sm focus:outline-none ${errors[field] ? 'focus:border-red-400' : 'focus:border-gold'}`;
 
     return (
         <div className="bg-cream min-h-screen py-16">
@@ -116,32 +152,39 @@ export default function CheckoutPage() {
                             <h2 className="text-2xl font-serif mb-4">Shipping Information</h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm mb-1 text-foreground">Full Name</label>
-                                    <input type="text" name="name" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">Full Name *</label>
+                                    <input type="text" name="name" onChange={handleChange} className={inputClass("name")} />
+                                    {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-sm mb-1 text-foreground">Phone Number</label>
-                                    <input type="text" name="phone" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">Phone Number *</label>
+                                    <input type="text" name="phone" onChange={handleChange} placeholder="10-digit number" className={inputClass("phone")} />
+                                    {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm mb-1 text-foreground">Email</label>
-                                    <input type="email" name="email" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">Email *</label>
+                                    <input type="email" name="email" onChange={handleChange} className={inputClass("email")} />
+                                    {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                                 </div>
                                 <div className="md:col-span-2">
-                                    <label className="block text-sm mb-1 text-foreground">Street Address</label>
-                                    <input type="text" name="street" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">Street Address *</label>
+                                    <input type="text" name="street" onChange={handleChange} className={inputClass("street")} />
+                                    {errors.street && <p className="text-red-500 text-xs mt-1">{errors.street}</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-sm mb-1 text-foreground">City</label>
-                                    <input type="text" name="city" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">City *</label>
+                                    <input type="text" name="city" onChange={handleChange} className={inputClass("city")} />
+                                    {errors.city && <p className="text-red-500 text-xs mt-1">{errors.city}</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-sm mb-1 text-foreground">State</label>
-                                    <input type="text" name="state" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">State *</label>
+                                    <input type="text" name="state" onChange={handleChange} className={inputClass("state")} />
+                                    {errors.state && <p className="text-red-500 text-xs mt-1">{errors.state}</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-sm mb-1 text-foreground">Pincode</label>
-                                    <input type="text" name="pincode" onChange={handleChange} required className="w-full border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold" />
+                                    <label className="block text-sm mb-1 text-foreground">Pincode *</label>
+                                    <input type="text" name="pincode" onChange={handleChange} placeholder="6-digit pincode" className={inputClass("pincode")} />
+                                    {errors.pincode && <p className="text-red-500 text-xs mt-1">{errors.pincode}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm mb-1 text-foreground">Country</label>
@@ -216,7 +259,7 @@ export default function CheckoutPage() {
                                 fullWidth
                                 size="lg"
                                 onClick={placeOrderHandler}
-                                disabled={cartItems.length === 0 || loading || !address.name || !address.phone || !address.street || !address.pincode}
+                                disabled={cartItems.length === 0 || loading}
                             >
                                 {loading ? "Processing..." : "Place Order"}
                             </Button>

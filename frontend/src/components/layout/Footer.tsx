@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Instagram, Mail, MapPin } from "lucide-react";
+import { Instagram, Mail } from "lucide-react";
 
 export const Footer = () => {
     return (
@@ -13,10 +13,10 @@ export const Footer = () => {
                             Whimsical, ethereal, and artistic handmade jewelry pieces tailored for your unique style.
                         </p>
                         <div className="flex space-x-4">
-                            <a href="#" className="text-foreground hover:text-gold transition">
+                            <a href="https://www.instagram.com/an.n.ash" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-gold transition">
                                 <Instagram className="w-5 h-5" />
                             </a>
-                            <a href="#" className="text-foreground hover:text-gold transition">
+                            <a href="mailto:anandashjewelry@gmail.com" className="text-foreground hover:text-gold transition">
                                 <Mail className="w-5 h-5" />
                             </a>
                         </div>
@@ -29,6 +29,7 @@ export const Footer = () => {
                             <li><Link href="/shop?category=Necklaces" className="text-sm text-foreground hover:text-gold transition">Necklaces</Link></li>
                             <li><Link href="/shop?category=Earrings" className="text-sm text-foreground hover:text-gold transition">Earrings</Link></li>
                             <li><Link href="/shop?category=Arm Cuffs" className="text-sm text-foreground hover:text-gold transition">Arm Cuffs</Link></li>
+                            <li><Link href="/shop?category=Hair Accessories" className="text-sm text-foreground hover:text-gold transition">Hair Accessories</Link></li>
                             <li><Link href="/shop?category=Rings" className="text-sm text-foreground hover:text-gold transition">Rings</Link></li>
                             <li><Link href="/custom-orders" className="text-sm text-foreground hover:text-gold transition">Custom Orders</Link></li>
                         </ul>
@@ -50,20 +51,15 @@ export const Footer = () => {
                     {/* Newsletter */}
                     <div>
                         <h3 className="font-serif text-lg text-foreground uppercase tracking-wider mb-4">Stay Connected</h3>
-                        <p className="text-sm text-foreground mb-4">Subscribe to receive updates, access to exclusive deals, and more.</p>
-                        <form className="flex flex-col space-y-2">
-                            <input
-                                type="email"
-                                placeholder="Enter your email"
-                                className="px-4 py-2 border border-beige bg-white focus:outline-none focus:border-gold rounded-sm text-sm"
-                            />
-                            <button
-                                type="submit"
-                                className="bg-gold text-white px-4 py-2 text-sm uppercase tracking-widest hover:bg-gold-dark transition rounded-sm"
-                            >
-                                Subscribe
-                            </button>
-                        </form>
+                        <p className="text-sm text-foreground mb-4">Follow us on Instagram for new drops, styling tips, and behind-the-scenes magic.</p>
+                        <a
+                            href="https://www.instagram.com/an.n.ash"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block bg-gold text-white px-6 py-2 text-sm uppercase tracking-widest hover:bg-gold-dark transition rounded-sm"
+                        >
+                            Follow on Instagram
+                        </a>
                     </div>
                 </div>
 

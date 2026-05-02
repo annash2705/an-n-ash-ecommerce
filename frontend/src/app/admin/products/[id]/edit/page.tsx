@@ -6,6 +6,8 @@ import Link from "next/link";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/Button";
 
+const CATEGORIES = ["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"];
+
 export default function ProductEditPage() {
     const router = useRouter();
     const params = useParams();
@@ -14,7 +16,7 @@ export default function ProductEditPage() {
     const [name, setName] = useState("");
     const [price, setPrice] = useState(0);
     const [description, setDescription] = useState("");
-    const [category, setCategory] = useState("");
+    const [category, setCategory] = useState("Necklaces");
     const [countInStock, setCountInStock] = useState(0);
     const [materials, setMaterials] = useState("");
     const [isHandmade, setIsHandmade] = useState(true);
@@ -50,6 +52,12 @@ export default function ProductEditPage() {
         const file = e.target.files?.[0];
         if (!file) return;
 
+        // Validate file size client-side
+        if (file.size > 5 * 1024 * 1024) {
+            alert("File size must be less than 5MB.");
+            return;
+        }
+
         const formData = new FormData();
         formData.append("image", file);
         setUploading(true);
@@ -59,7 +67,8 @@ export default function ProductEditPage() {
                 headers: { "Content-Type": "multipart/form-data" },
             };
             const { data } = await api.post("/upload", formData, config);
-            setImages([{ url: data.url, public_id: data.public_id }]);
+            // Append new image to existing images instead of replacing
+            setImages(prev => [...prev, { url: data.url, public_id: data.public_id }]);
         } catch (err) {
             alert("Image upload failed. Ensure Cloudinary credentials are correct.");
         } finally {
@@ -67,13 +76,13 @@ export default function ProductEditPage() {
         }
     };
 
+    const removeImage = (idx: number) => {
+        setImages(prev => prev.filter((_, i) => i !== idx));
+    };
+
     const submitHandler = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const userInfo = localStorage.getItem("userInfo");
-            const token = userInfo ? JSON.parse(userInfo).token : "";
-            const config = { headers: { Authorization: `Bearer ${token}` } };
-
             await api.put(`/products/${productId}`, {
                 name,
                 price,
@@ -83,14 +92,24 @@ export default function ProductEditPage() {
                 materials,
                 isHandmade,
                 images,
-            }, config);
+            });
             router.push("/admin/products");
-        } catch (err) {
-            alert("Error updating product");
+        } catch (err: any) {
+            const msg = err.response?.data?.errors
+                ? err.response.data.errors.join(", ")
+                : err.response?.data?.message || "Error updating product";
+            alert(msg);
         }
     };
 
-    if (loading) return <div>Loading...</div>;
+    if (loading) return (
+        <div className="max-w-3xl mx-auto animate-pulse space-y-6">
+            <div className="h-8 bg-beige rounded w-48"></div>
+            <div className="bg-white p-8 border border-beige rounded-xl shadow-sm space-y-4">
+                {[1, 2, 3, 4].map(i => <div key={i} className="h-10 bg-beige rounded"></div>)}
+            </div>
+        </div>
+    );
     if (error) return <div className="text-red-500">{error}</div>;
 
     return (
@@ -112,17 +131,25 @@ export default function ProductEditPage() {
 
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">Price (₹)</label>
-                            <input required type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                            <input required type="number" min="0" value={price} onChange={(e) => setPrice(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">Category</label>
-                            <input required type="text" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                            <select
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold"
+                            >
+                                {CATEGORIES.map(c => (
+                                    <option key={c} value={c}>{c}</option>
+                                ))}
+                            </select>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-foreground mb-1">Count In Stock</label>
-                            <input required type="number" value={countInStock} onChange={(e) => setCountInStock(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                            <input required type="number" min="0" value={countInStock} onChange={(e) => setCountInStock(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
                         </div>
 
                         <div className="md:col-span-2">
@@ -141,14 +168,25 @@ export default function ProductEditPage() {
                         </div>
 
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-foreground mb-1">Product Image</label>
-                            {images.length > 0 && images[0].url && (
-                                <div className="mb-4">
-                                    <img src={images[0].url} alt="Product" className="w-32 h-32 object-cover rounded-md border border-beige" />
+                            <label className="block text-sm font-medium text-foreground mb-1">Product Images</label>
+                            {images.length > 0 && (
+                                <div className="flex flex-wrap gap-3 mb-4">
+                                    {images.map((img, idx) => (
+                                        <div key={idx} className="relative group">
+                                            <img src={img.url} alt={`Product ${idx + 1}`} className="w-24 h-24 object-cover rounded-md border border-beige" />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(idx)}
+                                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
-                            <input type="file" onChange={uploadFileHandler} className="w-full border border-beige bg-gray-50 rounded-sm p-3 focus:outline-none focus:border-gold" />
-                            {uploading && <p className="text-sm mt-2">Uploading image...</p>}
+                            <input type="file" accept="image/*" onChange={uploadFileHandler} className="w-full border border-beige bg-gray-50 rounded-sm p-3 focus:outline-none focus:border-gold" />
+                            {uploading && <p className="text-sm mt-2 text-gold">Uploading image...</p>}
                         </div>
                     </div>
 

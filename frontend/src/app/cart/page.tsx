@@ -2,16 +2,22 @@
 
 import Link from "next/link";
 import { useCart } from "@/context/CartContext";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function CartPage() {
     const { cartItems, addToCart, removeFromCart, cartTotal } = useCart();
+    const { user } = useAuth();
     const router = useRouter();
 
     const checkoutHandler = () => {
-        router.push("/login?redirect=checkout");
+        if (user) {
+            router.push("/checkout");
+        } else {
+            router.push("/login?redirect=checkout");
+        }
     };
 
     return (
@@ -32,62 +38,65 @@ export default function CartPage() {
                         {/* Cart Items */}
                         <div className="lg:col-span-8">
                             <ul className="divide-y divide-beige border-t border-b border-beige">
-                                {cartItems.map((item) => (
-                                    <li key={item.product} className="py-6 flex sm:py-10">
-                                        <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-md overflow-hidden border border-beige">
-                                            <img
-                                                src={item.image}
-                                                alt={item.name}
-                                                className="w-full h-full object-cover object-center"
-                                            />
-                                        </div>
+                                {cartItems.map((item) => {
+                                    const maxQty = (item as any).countInStock || 10;
+                                    return (
+                                        <li key={item.product} className="py-6 flex sm:py-10">
+                                            <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-md overflow-hidden border border-beige">
+                                                <img
+                                                    src={item.image}
+                                                    alt={item.name}
+                                                    className="w-full h-full object-cover object-center"
+                                                />
+                                            </div>
 
-                                        <div className="ml-4 flex-1 flex flex-col justify-between sm:ml-6">
-                                            <div className="relative pr-9 sm:grid sm:grid-cols-2 sm:gap-x-6 sm:pr-0">
-                                                <div>
-                                                    <div className="flex justify-between">
-                                                        <h3 className="text-lg font-serif">
-                                                            <Link href={`/product/${item.product}`} className="text-foreground hover:text-gold transition">
-                                                                {item.name}
-                                                            </Link>
-                                                        </h3>
+                                            <div className="ml-4 flex-1 flex flex-col justify-between sm:ml-6">
+                                                <div className="relative pr-9 sm:grid sm:grid-cols-2 sm:gap-x-6 sm:pr-0">
+                                                    <div>
+                                                        <div className="flex justify-between">
+                                                            <h3 className="text-lg font-serif">
+                                                                <Link href={`/product/${item.product}`} className="text-foreground hover:text-gold transition">
+                                                                    {item.name}
+                                                                </Link>
+                                                            </h3>
+                                                        </div>
+                                                        <p className="mt-1 text-sm font-medium text-foreground">₹{item.price}</p>
                                                     </div>
-                                                    <p className="mt-1 text-sm font-medium text-foreground">₹{item.price}</p>
-                                                </div>
 
-                                                <div className="mt-4 sm:mt-0 sm:pr-9">
-                                                    <label htmlFor={`quantity-${item.product}`} className="sr-only">
-                                                        Quantity, {item.name}
-                                                    </label>
-                                                    <select
-                                                        id={`quantity-${item.product}`}
-                                                        name={`quantity-${item.product}`}
-                                                        value={item.qty}
-                                                        onChange={(e) => addToCart({ ...item, qty: Number(e.target.value) })}
-                                                        className="max-w-full rounded-md border border-beige py-1.5 text-base leading-5 font-medium text-foreground text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-gold focus:border-gold sm:text-sm"
-                                                    >
-                                                        {[1, 2, 3, 4, 5].map((x) => (
-                                                            <option key={x} value={x}>
-                                                                {x}
-                                                            </option>
-                                                        ))}
-                                                    </select>
-
-                                                    <div className="absolute top-0 right-0 sm:top-auto sm:bottom-0">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeFromCart(item.product)}
-                                                            className="-m-2 p-2 inline-flex text-foreground hover:text-red-500 transition"
+                                                    <div className="mt-4 sm:mt-0 sm:pr-9">
+                                                        <label htmlFor={`quantity-${item.product}`} className="sr-only">
+                                                            Quantity, {item.name}
+                                                        </label>
+                                                        <select
+                                                            id={`quantity-${item.product}`}
+                                                            name={`quantity-${item.product}`}
+                                                            value={item.qty}
+                                                            onChange={(e) => addToCart({ ...item, qty: Number(e.target.value) })}
+                                                            className="max-w-full rounded-md border border-beige py-1.5 text-base leading-5 font-medium text-foreground text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-gold focus:border-gold sm:text-sm"
                                                         >
-                                                            <span className="sr-only">Remove</span>
-                                                            <Trash2 className="h-5 w-5" aria-hidden="true" />
-                                                        </button>
+                                                            {Array.from({ length: Math.min(maxQty, 10) }, (_, i) => i + 1).map((x) => (
+                                                                <option key={x} value={x}>
+                                                                    {x}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+
+                                                        <div className="absolute top-0 right-0 sm:top-auto sm:bottom-0">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => removeFromCart(item.product)}
+                                                                className="-m-2 p-2 inline-flex text-foreground hover:text-red-500 transition"
+                                                            >
+                                                                <span className="sr-only">Remove</span>
+                                                                <Trash2 className="h-5 w-5" aria-hidden="true" />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    </li>
-                                ))}
+                                        </li>
+                                    );
+                                })}
                             </ul>
 
                             <div className="mt-8 flex justify-between">

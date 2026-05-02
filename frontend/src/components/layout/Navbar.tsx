@@ -2,16 +2,23 @@
 
 import Link from "next/link";
 import { ShoppingCart, User, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
+import { usePathname } from "next/navigation";
 
 export const Navbar = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { cartItems } = useCart();
     const { user, logout } = useAuth();
+    const pathname = usePathname();
 
     const cartCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
+
+    // Close mobile menu on route change
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+    }, [pathname]);
 
     return (
         <header className="bg-cream sticky top-0 z-50 border-b border-beige">

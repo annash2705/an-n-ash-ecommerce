@@ -4,6 +4,7 @@ const {
     addOrderItems,
     getOrderById,
     updateOrderStatus,
+    cancelOrder,
     getMyOrders,
     getOrders,
     createRazorpayOrder,
@@ -20,6 +21,7 @@ router.route("/:id").get(protect, getOrderById);
 router.route("/:id/pay").post(protect, createRazorpayOrder);
 router.route("/:id/verify").post(protect, verifyRazorpayPayment);
 router.route("/:id/status").put(protect, admin, updateOrderStatus);
+router.route("/:id/cancel").put(protect, cancelOrder);
 router.route("/:id/generate-label").post(protect, admin, generateShiprocketLabel);
 
 module.exports = router;

@@ -3,6 +3,7 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
 const router = express.Router();
+const { protect } = require("../middlewares/authMiddleware");
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -18,9 +19,14 @@ const storage = new CloudinaryStorage({
     },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024, // 5MB max
+    },
+});
 
-router.post("/", upload.single("image"), (req, res) => {
+router.post("/", protect, upload.single("image"), (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json({ message: "No image provided" });

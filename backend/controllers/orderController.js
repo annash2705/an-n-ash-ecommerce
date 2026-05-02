@@ -11,6 +11,28 @@ const razorpay = new Razorpay({
     key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
+// Helper: Decrement stock for ordered items
+const decrementStock = async (orderItems) => {
+    for (const item of orderItems) {
+        const product = await Product.findById(item.product);
+        if (product) {
+            product.countInStock = Math.max(0, product.countInStock - item.qty);
+            await product.save();
+        }
+    }
+};
+
+// Helper: Restore stock for cancelled order items
+const restoreStock = async (orderItems) => {
+    for (const item of orderItems) {
+        const product = await Product.findById(item.product);
+        if (product) {
+            product.countInStock += item.qty;
+            await product.save();
+        }
+    }
+};
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
@@ -24,51 +46,66 @@ const addOrderItems = async (req, res) => {
         totalPrice,
     } = req.body;
 
-    if (orderItems && orderItems.length === 0) {
-        res.status(400).json({ message: "No order items" });
-        return;
-    } else {
-        try {
-            const order = new Order({
-                orderItems,
-                user: req.user._id,
-                shippingAddress,
-                paymentMethod,
-                itemsPrice,
-                shippingPrice,
-                totalPrice,
-            });
+    if (!orderItems || orderItems.length === 0) {
+        return res.status(400).json({ message: "No order items" });
+    }
 
-            const createdOrder = await order.save();
+    try {
+        // Validate stock availability before creating order
+        for (const item of orderItems) {
+            const product = await Product.findById(item.product);
+            if (!product) {
+                return res.status(404).json({ message: `Product not found: ${item.name}` });
+            }
+            if (product.countInStock < item.qty) {
+                return res.status(400).json({
+                    message: `Insufficient stock for ${product.name}. Only ${product.countInStock} available.`
+                });
+            }
+        }
 
-            // If Cash on Delivery, trigger Shiprocket immediately since it's confirmed
-            if (paymentMethod === "Cash on Delivery") {
-                try {
-                    const fulfillment = await processShiprocketFulfillment(createdOrder);
-                    if (fulfillment) {
-                        if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
-                        if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
-                        if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                        await createdOrder.save();
-                    }
-                } catch (srErr) {
-                    console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
+        const order = new Order({
+            orderItems,
+            user: req.user._id,
+            shippingAddress,
+            paymentMethod,
+            itemsPrice,
+            shippingPrice,
+            totalPrice,
+        });
+
+        const createdOrder = await order.save();
+
+        // Decrement stock for all ordered items
+        await decrementStock(orderItems);
+
+        // If Cash on Delivery, trigger Shiprocket immediately since it's confirmed
+        if (paymentMethod === "Cash on Delivery") {
+            try {
+                const fulfillment = await processShiprocketFulfillment(createdOrder);
+                if (fulfillment) {
+                    if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
+                    if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
+                    if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                    await createdOrder.save();
                 }
-
-                try {
-                    sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice).catch(emailErr => {
-                        console.error("Email API failed internally.", emailErr.message);
-                    });
-                } catch (emailErr) {
-                    console.error("Email API failed during COD, but order is saved.", emailErr.message);
-                }
+            } catch (srErr) {
+                console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
             }
 
-            res.status(201).json(createdOrder);
-        } catch (error) {
-            console.error("DEBUG ORDER ERROR: ", error); // Added detailed logging
-            res.status(500).json({ message: "Server error", error: error.message });
+            try {
+                sendOrderConfirmationEmail(req.user.email, createdOrder._id, createdOrder.totalPrice).catch(emailErr => {
+                    console.error("Email API failed internally.", emailErr.message);
+                });
+            } catch (emailErr) {
+                console.error("Email API failed during COD, but order is saved.", emailErr.message);
+            }
         }
+
+        res.status(201).json(createdOrder);
+    } catch (error) {
+        console.error("DEBUG ORDER ERROR: ", error);
+        res.status(500).json({ message: "Server error", error: error.message });
     }
 };
 
@@ -201,12 +238,45 @@ const updateOrderStatus = async (req, res) => {
     }
 };
 
+// @desc    Cancel an order
+// @route   PUT /api/orders/:id/cancel
+// @access  Private
+const cancelOrder = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        // Only allow cancellation by order owner or admin
+        if (!req.user.isAdmin && !order.user.equals(req.user._id)) {
+            return res.status(403).json({ message: "Not authorized" });
+        }
+
+        // Cannot cancel shipped/delivered orders
+        if (["shipped", "out for delivery", "delivered"].includes(order.orderStatus)) {
+            return res.status(400).json({ message: "Cannot cancel an order that has already been shipped or delivered." });
+        }
+
+        order.orderStatus = "cancelled";
+
+        // Restore stock
+        await restoreStock(order.orderItems);
+
+        const updatedOrder = await order.save();
+        res.json(updatedOrder);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
 // @desc    Get logged in user orders
 // @route   GET /api/orders/myorders
 // @access  Private
 const getMyOrders = async (req, res) => {
     try {
-        const orders = await Order.find({ user: req.user._id });
+        const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 });
         res.json(orders);
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
@@ -218,7 +288,7 @@ const getMyOrders = async (req, res) => {
 // @access  Private/Admin
 const getOrders = async (req, res) => {
     try {
-        const orders = await Order.find({}).populate("user", "id name");
+        const orders = await Order.find({}).populate("user", "id name").sort({ createdAt: -1 });
         res.json(orders);
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
@@ -285,6 +355,7 @@ module.exports = {
     addOrderItems,
     getOrderById,
     updateOrderStatus,
+    cancelOrder,
     getMyOrders,
     getOrders,
     createRazorpayOrder,

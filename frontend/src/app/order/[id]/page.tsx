@@ -6,6 +6,9 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import Script from "next/script";
+
+const ALL_STATUSES = ["order placed", "processing", "packed", "shipped", "out for delivery", "delivered"];
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -14,32 +17,105 @@ export default function OrderDetailsPage() {
 
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [payLoading, setPayLoading] = useState(false);
+    const [cancelLoading, setCancelLoading] = useState(false);
+
+    const fetchOrder = async () => {
+        try {
+            const { data } = await api.get(`/orders/${id}`);
+            setOrder(data);
+        } catch (error) {
+            console.log("Error fetching order");
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
         if (!user) {
             router.push("/login");
             return;
         }
-
-        const fetchOrder = async () => {
-            try {
-                const { data } = await api.get(`/orders/${id}`);
-                setOrder(data);
-            } catch (error) {
-                console.log("Error fetching order");
-            } finally {
-                setLoading(false);
-            }
-        };
-
         if (id) fetchOrder();
     }, [id, user, router]);
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center bg-cream"><p>Loading order...</p></div>;
-    if (!order) return <div className="min-h-screen flex items-center justify-center bg-cream"><p>Order Not Found</p></div>;
+    const handlePayNow = async () => {
+        setPayLoading(true);
+        try {
+            const { data: clientId } = await api.get("/config/razorpay");
+            const { data: rzpOrder } = await api.post(`/orders/${order._id}/pay`);
+
+            const options = {
+                key: clientId,
+                amount: rzpOrder.amount,
+                currency: rzpOrder.currency,
+                name: "An.n.Ash",
+                description: "Order Payment",
+                order_id: rzpOrder.id,
+                handler: async function (response: any) {
+                    try {
+                        await api.post(`/orders/${order._id}/verify`, response);
+                        fetchOrder(); // Refresh order to show paid status
+                    } catch (err) {
+                        alert("Payment verification failed.");
+                    }
+                },
+                prefill: {
+                    name: order.shippingAddress.name,
+                    email: order.shippingAddress.email,
+                    contact: order.shippingAddress.phone
+                },
+                theme: {
+                    color: "#D4AF37"
+                }
+            };
+
+            const rzp = new (window as any).Razorpay(options);
+            rzp.on("payment.failed", function (response: any) {
+                alert("Payment Failed: " + response.error.description);
+            });
+            rzp.open();
+        } catch (err) {
+            alert("Failed to initiate payment. Please try again.");
+        } finally {
+            setPayLoading(false);
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!confirm("Are you sure you want to cancel this order?")) return;
+        setCancelLoading(true);
+        try {
+            await api.put(`/orders/${order._id}/cancel`);
+            fetchOrder();
+        } catch (err: any) {
+            alert(err.response?.data?.message || "Failed to cancel order.");
+        } finally {
+            setCancelLoading(false);
+        }
+    };
+
+    if (loading) return (
+        <div className="min-h-screen flex items-center justify-center bg-cream">
+            <div className="animate-pulse text-gold text-lg">Loading order...</div>
+        </div>
+    );
+    if (!order) return (
+        <div className="min-h-screen flex items-center justify-center bg-cream">
+            <div className="text-center">
+                <p className="text-red-500 text-lg mb-4">Order Not Found</p>
+                <Button variant="outline" onClick={() => router.push("/profile")}>Back to Profile</Button>
+            </div>
+        </div>
+    );
+
+    // Determine which step index we're at for the timeline
+    const currentStepIndex = ALL_STATUSES.indexOf(order.orderStatus);
+    const isCancelled = order.orderStatus === "cancelled";
 
     return (
         <div className="bg-cream min-h-screen py-16">
+            <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8">
                     <h1 className="text-3xl font-serif text-foreground">Order #{order._id.substring(0, 10)}</h1>
@@ -57,22 +133,40 @@ export default function OrderDetailsPage() {
                         <div className="bg-white p-6 border border-beige rounded-xl shadow-sm">
                             <h2 className="text-xl font-serif mb-4 flex justify-between items-center">
                                 Order Tracking
-                                <span className="text-sm font-sans font-normal uppercase tracking-widest text-gold bg-beige px-3 py-1 rounded-full">{order.orderStatus}</span>
+                                <span className={`text-sm font-sans font-normal uppercase tracking-widest px-3 py-1 rounded-full ${isCancelled ? 'text-red-600 bg-red-50' : 'text-gold bg-beige'}`}>
+                                    {order.orderStatus}
+                                </span>
                             </h2>
-                            {/* Simplified timeline */}
-                            <div className="mt-8 flex justify-between relative before:absolute before:border-t-2 before:border-beige before:w-full before:top-4 before:z-0">
-                                {["order placed", "shipped", "delivered"].map((step, idx) => {
-                                    const isActive = order.orderStatus === step || order.isDelivered; // Simplified map
-                                    return (
-                                        <div key={idx} className="relative z-10 flex flex-col items-center">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-gold text-white' : 'bg-gray-200 text-gray-400'}`}>
-                                                {idx + 1}
+
+                            {isCancelled ? (
+                                <div className="text-center py-4 text-red-500 font-medium">
+                                    This order has been cancelled.
+                                </div>
+                            ) : (
+                                <div className="mt-8 flex justify-between relative">
+                                    {/* Progress line */}
+                                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-beige z-0"></div>
+                                    <div
+                                        className="absolute top-4 left-0 h-0.5 bg-gold z-0 transition-all duration-500"
+                                        style={{ width: `${Math.max(0, (currentStepIndex / (ALL_STATUSES.length - 1)) * 100)}%` }}
+                                    ></div>
+
+                                    {ALL_STATUSES.map((step, idx) => {
+                                        const isCompleted = idx <= currentStepIndex;
+                                        const isCurrent = idx === currentStepIndex;
+                                        return (
+                                            <div key={idx} className="relative z-10 flex flex-col items-center flex-1">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${isCompleted ? 'bg-gold text-white' : 'bg-gray-200 text-gray-400'} ${isCurrent ? 'ring-2 ring-gold ring-offset-2' : ''}`}>
+                                                    {isCompleted ? '✓' : idx + 1}
+                                                </div>
+                                                <span className={`text-[10px] sm:text-xs mt-2 uppercase tracking-wider text-center ${isCompleted ? 'text-foreground font-semibold' : 'text-gray-400'}`}>
+                                                    {step}
+                                                </span>
                                             </div>
-                                            <span className={`text-xs mt-2 uppercase tracking-wider ${isActive ? 'text-foreground font-semibold' : 'text-gray-400'}`}>{step}</span>
-                                        </div>
-                                    )
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
                             {order.trackingId && (
                                 <div className="mt-6 pt-6 border-t border-beige">
@@ -121,10 +215,18 @@ export default function OrderDetailsPage() {
                                     <dd>₹{order.totalPrice}</dd>
                                 </div>
                             </dl>
-                            {!order.isPaid && order.paymentMethod === "Razorpay" && (
+                            {!order.isPaid && order.paymentMethod === "Razorpay" && !isCancelled && (
                                 <div className="mt-6">
-                                    <Button fullWidth onClick={() => alert("Razorpay mock flow. Payment successful")}>
-                                        Pay Now
+                                    <Button fullWidth onClick={handlePayNow} disabled={payLoading}>
+                                        {payLoading ? "Initiating Payment..." : "Pay Now"}
+                                    </Button>
+                                </div>
+                            )}
+                            {/* Cancel Order Button */}
+                            {!isCancelled && !["shipped", "out for delivery", "delivered"].includes(order.orderStatus) && (
+                                <div className="mt-4">
+                                    <Button variant="ghost" fullWidth onClick={handleCancelOrder} disabled={cancelLoading} className="text-red-500 hover:bg-red-50">
+                                        {cancelLoading ? "Cancelling..." : "Cancel Order"}
                                     </Button>
                                 </div>
                             )}

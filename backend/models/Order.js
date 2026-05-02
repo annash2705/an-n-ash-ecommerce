@@ -63,9 +63,9 @@ const orderSchema = new mongoose.Schema(
         paidAt: {
             type: Date,
         },
-        orderStatus: { // Added custom statuses based on requirements
+        orderStatus: {
             type: String,
-            enum: ["order placed", "processing", "packed", "shipped", "out for delivery", "delivered"],
+            enum: ["order placed", "processing", "packed", "shipped", "out for delivery", "delivered", "cancelled"],
             default: "order placed",
         },
         isDelivered: {

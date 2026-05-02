@@ -1,50 +1,70 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { ProductCard } from "@/components/ui/ProductCard";
 import api from "@/lib/axios";
-
-// Mock fallbacks if API is empty
-const MOCK_PRODUCTS = [
-    { _id: "1", name: "Ethereal Pearl Choker", price: 3200, category: "Necklaces", image: "https://images.unsplash.com/photo-1599643478524-fb66f70d00f8?w=800" },
-    { _id: "2", name: "Golden Leaf Drop Earrings", price: 1800, category: "Earrings", image: "https://images.unsplash.com/photo-1630019852942-f89202989a59?w=800" },
-    { _id: "3", name: "Rose Quartz Healing Ring", price: 2500, category: "Rings", image: "https://images.unsplash.com/photo-1605100804763-247f67b2548e?w=800" },
-    { _id: "4", name: "Bohemian Arm Cuff", price: 2100, category: "Arm Cuffs", image: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800" },
-    { _id: "5", name: "Starlet Hair Vine", price: 1500, category: "Hair Accessories", image: "https://images.unsplash.com/photo-1599643478524-fb66f70d00f8?w=800" }, // Reused image for mock
-    { _id: "6", name: "Sunburst Pendant", price: 2800, category: "Necklaces", image: "https://images.unsplash.com/photo-1630019852942-f89202989a59?w=800" }, // Reused image
-];
+import { useSearchParams } from "next/navigation";
 
 export default function ShopPage() {
-    const [products, setProducts] = useState(MOCK_PRODUCTS);
-    const [filteredProducts, setFilteredProducts] = useState(MOCK_PRODUCTS);
-    const [category, setCategory] = useState("All");
+    return (
+        <Suspense fallback={<div className="bg-cream min-h-screen flex items-center justify-center"><div className="animate-pulse text-gold text-lg">Loading collection...</div></div>}>
+            <ShopContent />
+        </Suspense>
+    );
+}
+
+function ShopContent() {
+    const searchParams = useSearchParams();
+    const urlCategory = searchParams.get("category") || "All";
+
+    const [products, setProducts] = useState<any[]>([]);
+    const [filteredProducts, setFilteredProducts] = useState<any[]>([]);
+    const [category, setCategory] = useState(urlCategory);
     const [sort, setSort] = useState("newest");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+    const [searchKeyword, setSearchKeyword] = useState("");
 
     useEffect(() => {
-        // Attempt to fetch from real API
         const fetchProducts = async () => {
             try {
+                setLoading(true);
                 const { data } = await api.get("/products");
-                if (data && data.length > 0) {
-                    // Flatten images structure to match mock for simple rendering
-                    const formatted = data.map((p: any) => ({
+                const allProducts = data.products || data;
+                if (allProducts && allProducts.length > 0) {
+                    const formatted = allProducts.map((p: any) => ({
                         ...p,
-                        image: p.images && p.images.length > 0 ? p.images[0].url : "https://via.placeholder.com/800x1000"
+                        image: p.images && p.images.length > 0 ? p.images[0].url : "https://via.placeholder.com/800x1000?text=No+Image"
                     }));
                     setProducts(formatted);
-                    setFilteredProducts(formatted);
+                } else {
+                    setProducts([]);
                 }
-            } catch (error) {
-                console.log("Using mock data as API failed or empty");
+            } catch (err) {
+                setError("Failed to load products. Please try again later.");
+            } finally {
+                setLoading(false);
             }
         };
         fetchProducts();
     }, []);
 
     useEffect(() => {
+        setCategory(urlCategory);
+    }, [urlCategory]);
+
+    useEffect(() => {
         let result = [...products];
 
-        // Filter
+        // Search
+        if (searchKeyword.trim()) {
+            result = result.filter(p =>
+                p.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                p.description?.toLowerCase().includes(searchKeyword.toLowerCase())
+            );
+        }
+
+        // Filter by category
         if (category !== "All") {
             result = result.filter(p => p.category === category);
         }
@@ -54,10 +74,12 @@ export default function ShopPage() {
             result.sort((a, b) => a.price - b.price);
         } else if (sort === "price-high") {
             result.sort((a, b) => b.price - a.price);
-        } // "newest" or default relies on initial/fetched order usually, or could sort by ID string comparison for mocks
+        } else if (sort === "popular") {
+            result.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        }
 
         setFilteredProducts(result);
-    }, [category, sort, products]);
+    }, [category, sort, products, searchKeyword]);
 
     const categories = ["All", "Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"];
 
@@ -71,6 +93,17 @@ export default function ShopPage() {
                     <p className="text-foreground max-w-2xl mx-auto">
                         Discover handmade jewelry inspired by art, nature, and magic.
                     </p>
+                </div>
+
+                {/* Search Bar */}
+                <div className="mb-8 max-w-xl mx-auto">
+                    <input
+                        type="text"
+                        placeholder="Search jewelry by name..."
+                        value={searchKeyword}
+                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        className="w-full border border-beige rounded-full px-6 py-3 text-sm focus:outline-none focus:border-gold bg-white shadow-sm placeholder-gray-400"
+                    />
                 </div>
 
                 <div className="flex flex-col md:flex-row gap-8">
@@ -104,7 +137,7 @@ export default function ShopPage() {
                                     <option value="newest">Newest Arrivals</option>
                                     <option value="price-low">Price: Low to High</option>
                                     <option value="price-high">Price: High to Low</option>
-                                    <option value="popular">Best Selling</option>
+                                    <option value="popular">Best Rated</option>
                                 </select>
                             </div>
 
@@ -117,10 +150,28 @@ export default function ShopPage() {
                             <p className="text-sm text-foreground">Showing {filteredProducts.length} results for {category === 'All' ? 'everything' : category}</p>
                         </div>
 
-                        {filteredProducts.length === 0 ? (
+                        {loading ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {[1, 2, 3, 4, 5, 6].map(i => (
+                                    <div key={i} className="bg-white border border-beige rounded-xl overflow-hidden animate-pulse">
+                                        <div className="aspect-[4/5] bg-beige"></div>
+                                        <div className="p-5 space-y-3">
+                                            <div className="h-3 bg-beige rounded w-1/3 mx-auto"></div>
+                                            <div className="h-4 bg-beige rounded w-2/3 mx-auto"></div>
+                                            <div className="h-4 bg-beige rounded w-1/4 mx-auto"></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : error ? (
+                            <div className="text-center py-20 bg-white border border-beige rounded-xl">
+                                <p className="text-red-500 text-lg mb-4">{error}</p>
+                                <button onClick={() => window.location.reload()} className="text-gold hover:underline">Try Again</button>
+                            </div>
+                        ) : filteredProducts.length === 0 ? (
                             <div className="text-center py-20 bg-white border border-beige rounded-xl">
                                 <p className="text-foreground text-lg">No pieces found matching your criteria.</p>
-                                <button onClick={() => { setCategory('All'); setSort('newest'); }} className="mt-4 text-gold hover:underline">Clear Filters</button>
+                                <button onClick={() => { setCategory('All'); setSort('newest'); setSearchKeyword(''); }} className="mt-4 text-gold hover:underline">Clear Filters</button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -50,14 +50,15 @@ export default function AdminOrdersPage() {
     };
 
     const handleMarkPickedUp = async (id: string) => {
-        // Update order to "shipped" to reflect on customer side
         await statusChangeHandler(id, "shipped");
         alert("Order marked as Picked Up! Customer tracking updated.");
     };
 
     // Filter orders based on active tab
     const displayedOrders = orders.filter((order: any) =>
-        activeTab === 'pending' ? order.orderStatus !== 'delivered' : order.orderStatus === 'delivered'
+        activeTab === 'pending'
+            ? !['delivered', 'cancelled'].includes(order.orderStatus)
+            : ['delivered', 'cancelled'].includes(order.orderStatus)
     );
 
     return (
@@ -72,19 +73,21 @@ export default function AdminOrdersPage() {
                     onClick={() => setActiveTab('pending')}
                     className={`pb-2 px-1 text-sm tracking-wider uppercase font-medium transition-colors border-b-2 ${activeTab === 'pending' ? 'border-gold text-gold-dark' : 'border-transparent text-gray-500 hover:text-foreground'}`}
                 >
-                    Pending Orders
+                    Active Orders
                 </button>
                 <button
                     onClick={() => setActiveTab('completed')}
                     className={`pb-2 px-1 text-sm tracking-wider uppercase font-medium transition-colors border-b-2 ${activeTab === 'completed' ? 'border-gold text-gold-dark' : 'border-transparent text-gray-500 hover:text-foreground'}`}
                 >
-                    Completed Orders
+                    Completed / Cancelled
                 </button>
             </div>
 
             <div className="bg-white border border-beige rounded-xl shadow-sm overflow-hidden">
                 {loading ? (
-                    <p className="p-6">Loading orders...</p>
+                    <div className="p-6 space-y-3">
+                        {[1, 2, 3].map(i => <div key={i} className="h-12 bg-beige rounded animate-pulse"></div>)}
+                    </div>
                 ) : (
                     <div className="overflow-x-auto min-h-[400px]">
                         <table className="w-full text-left border-collapse">
@@ -94,6 +97,7 @@ export default function AdminOrdersPage() {
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">USER</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">DATE</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">TOTAL</th>
+                                    <th className="py-3 px-4 text-sm font-semibold text-foreground">PAID</th>
                                     <th className="py-3 px-4 text-sm font-semibold text-foreground">STATUS</th>
                                     {activeTab === 'pending' && <th className="py-3 px-4 text-sm font-semibold text-foreground text-right">ACTION</th>}
                                 </tr>
@@ -101,7 +105,7 @@ export default function AdminOrdersPage() {
                             <tbody>
                                 {displayedOrders.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-10 text-gray-400">No {activeTab} orders found.</td>
+                                        <td colSpan={7} className="text-center py-10 text-gray-400">No {activeTab} orders found.</td>
                                     </tr>
                                 ) : displayedOrders.map((order: any) => (
                                     <tr key={order._id} className="border-b border-beige last:border-b-0 hover:bg-gray-50">
@@ -110,18 +114,31 @@ export default function AdminOrdersPage() {
                                         <td className="py-4 px-4 text-sm text-foreground">{new Date(order.createdAt).toLocaleDateString()}</td>
                                         <td className="py-4 px-4 text-sm text-foreground">₹{order.totalPrice}</td>
                                         <td className="py-4 px-4 text-sm">
-                                            <select
-                                                value={order.orderStatus}
-                                                onChange={(e) => statusChangeHandler(order._id, e.target.value)}
-                                                className="border border-beige rounded-sm p-1 text-sm bg-white focus:outline-none focus:border-gold"
-                                            >
-                                                <option value="order placed">Order Placed</option>
-                                                <option value="processing">Processing</option>
-                                                <option value="packed">Packed</option>
-                                                <option value="shipped">Shipped</option>
-                                                <option value="out for delivery">Out for Delivery</option>
-                                                <option value="delivered">Delivered</option>
-                                            </select>
+                                            <span className={order.isPaid ? 'text-green-600' : 'text-red-500'}>
+                                                {order.isPaid ? 'Yes' : 'No'}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-4 text-sm">
+                                            {order.orderStatus === 'cancelled' ? (
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600">Cancelled</span>
+                                            ) : activeTab === 'pending' ? (
+                                                <select
+                                                    value={order.orderStatus}
+                                                    onChange={(e) => statusChangeHandler(order._id, e.target.value)}
+                                                    className="border border-beige rounded-sm p-1 text-sm bg-white focus:outline-none focus:border-gold"
+                                                >
+                                                    <option value="order placed">Order Placed</option>
+                                                    <option value="processing">Processing</option>
+                                                    <option value="packed">Packed</option>
+                                                    <option value="shipped">Shipped</option>
+                                                    <option value="out for delivery">Out for Delivery</option>
+                                                    <option value="delivered">Delivered</option>
+                                                </select>
+                                            ) : (
+                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                                    {order.orderStatus}
+                                                </span>
+                                            )}
                                         </td>
                                         {activeTab === 'pending' && (
                                             <td className="py-4 px-4 text-sm text-right space-x-2">

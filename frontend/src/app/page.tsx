@@ -6,15 +6,16 @@ export default async function Home() {
   let featuredProducts = [];
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/products`, {
-      cache: 'no-store' // Ensure fresh data on reload
+      cache: 'no-store'
     });
     if (res.ok) {
-      const allProducts = await res.json();
+      const data = await res.json();
+      const allProducts = data.products || data;
 
       // Group products by category and find the lowest price in each
       const cheapestByCategory: Record<string, any> = {};
 
-      (allProducts.products || allProducts).forEach((product: any) => {
+      (Array.isArray(allProducts) ? allProducts : []).forEach((product: any) => {
         const cat = product.category;
         if (!cat) return;
 
@@ -102,15 +103,15 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* Categories */}
+      {/* Categories — now includes Hair Accessories */}
       <section className="py-24 bg-cream">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl font-serif text-center mb-16 text-foreground">Shop by Category</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {["Necklaces", "Earrings", "Arm Cuffs", "Rings"].map((category) => (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+            {["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"].map((category) => (
               <Link href={`/shop?category=${category}`} key={category} className="group text-center">
-                <div className="w-32 h-32 md:w-48 md:h-48 mx-auto rounded-full bg-beige border border-gold border-opacity-30 flex items-center justify-center mb-6 group-hover:bg-pink-soft transition duration-500">
-                  <h3 className="font-serif text-xl text-foreground text-opacity-80 group-hover:text-gold-dark transition">{category}</h3>
+                <div className="w-32 h-32 md:w-40 md:h-40 mx-auto rounded-full bg-beige border border-gold border-opacity-30 flex items-center justify-center mb-6 group-hover:bg-pink-soft transition duration-500">
+                  <h3 className="font-serif text-lg text-foreground text-opacity-80 group-hover:text-gold-dark transition text-center px-2">{category}</h3>
                 </div>
                 <span className="uppercase tracking-widest text-sm text-foreground group-hover:text-gold transition">Explore</span>
               </Link>
