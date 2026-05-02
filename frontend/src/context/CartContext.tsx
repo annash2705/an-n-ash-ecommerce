@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 
 export interface CartItem {
     product: string;
@@ -31,13 +31,17 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
     const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
     useEffect(() => {
-        const storedCart = localStorage.getItem("cartItems");
-        if (storedCart) {
-            setCartItems(JSON.parse(storedCart));
+        try {
+            const storedCart = localStorage.getItem("cartItems");
+            if (storedCart) {
+                setCartItems(JSON.parse(storedCart));
+            }
+        } catch (e) {
+            // localStorage unavailable
         }
     }, []);
 
-    const addToCart = (item: CartItem) => {
+    const addToCart = useCallback((item: CartItem) => {
         setCartItems((prev) => {
             const existItemStr = prev.find((x) => x.product === item.product);
             let updatedCart;
@@ -48,23 +52,23 @@ export const CartProvider = ({ children }: { children: ReactNode }) => {
             } else {
                 updatedCart = [...prev, item];
             }
-            localStorage.setItem("cartItems", JSON.stringify(updatedCart));
+            try { localStorage.setItem("cartItems", JSON.stringify(updatedCart)); } catch (e) { }
             return updatedCart;
         });
-    };
+    }, []);
 
-    const removeFromCart = (id: string) => {
+    const removeFromCart = useCallback((id: string) => {
         setCartItems((prev) => {
             const updatedCart = prev.filter((x) => x.product !== id);
-            localStorage.setItem("cartItems", JSON.stringify(updatedCart));
+            try { localStorage.setItem("cartItems", JSON.stringify(updatedCart)); } catch (e) { }
             return updatedCart;
         });
-    };
+    }, []);
 
-    const clearCart = () => {
+    const clearCart = useCallback(() => {
         setCartItems([]);
-        localStorage.removeItem("cartItems");
-    };
+        try { localStorage.removeItem("cartItems"); } catch (e) { }
+    }, []);
 
     const cartTotal = cartItems.reduce((acc, item) => acc + item.price * item.qty, 0);
 
