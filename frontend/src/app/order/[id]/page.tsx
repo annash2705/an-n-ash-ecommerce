@@ -7,6 +7,7 @@ import api from "@/lib/axios";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import Script from "next/script";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 const ALL_STATUSES = ["order placed", "processing", "packed", "shipped", "out for delivery", "delivered"];
 
@@ -182,7 +183,7 @@ export default function OrderDetailsPage() {
                                 {order.orderItems.map((item: any) => (
                                     <li key={item.product} className="py-4 flex">
                                         <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-white border border-beige rounded-md overflow-hidden">
-                                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                            <img src={getOptimizedImageUrl(item.image)} alt={item.name} className="w-full h-full object-cover" />
                                         </div>
                                         <div className="ml-4 flex-1 flex flex-col justify-center">
                                             <Link href={`/product/${item.product}`} className="font-serif text-lg hover:text-gold transition">

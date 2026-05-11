@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "./Button";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 interface ProductCardProps {
     product: {
@@ -17,7 +18,7 @@ export const ProductCard = ({ product }: ProductCardProps) => {
             <Link href={`/product/${product._id}`} className="relative aspect-[4/5] overflow-hidden block">
                 {/* Abstracting image to simple img tag for easy mocking */}
                 <img
-                    src={product.image}
+                    src={getOptimizedImageUrl(product.image)}
                     alt={product.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
                 />

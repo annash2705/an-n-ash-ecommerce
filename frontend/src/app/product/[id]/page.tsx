@@ -6,6 +6,7 @@ import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import api from "@/lib/axios";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 export default function ProductDetailsPage() {
     const { id } = useParams();
@@ -44,7 +45,7 @@ export default function ProductDetailsPage() {
         addToCart({
             product: product._id,
             name: product.name,
-            image: (product.images && product.images[0]?.url) || "",
+            image: (product.images && product.images[0]?.url) ? getOptimizedImageUrl(product.images[0].url) : "",
             price: product.price,
             qty,
             countInStock: product.countInStock,
@@ -94,7 +95,7 @@ export default function ProductDetailsPage() {
                     <div className="mb-10 lg:mb-0">
                         <div className="aspect-[4/5] overflow-hidden rounded-2xl border border-beige bg-white">
                             <img
-                                src={(product.images && product.images[0]?.url) || "https://via.placeholder.com/800?text=No+Image"}
+                                src={getOptimizedImageUrl((product.images && product.images[0]?.url) || "https://via.placeholder.com/800?text=No+Image")}
                                 alt={product.name}
                                 className="w-full h-full object-cover"
                             />
@@ -104,7 +105,7 @@ export default function ProductDetailsPage() {
                             <div className="grid grid-cols-4 gap-2 mt-4">
                                 {product.images.map((img: any, idx: number) => (
                                     <div key={idx} className="aspect-square rounded-lg border border-beige overflow-hidden bg-white">
-                                        <img src={img.url} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" />
+                                        <img src={getOptimizedImageUrl(img.url)} alt={`${product.name} ${idx + 1}`} className="w-full h-full object-cover" />
                                     </div>
                                 ))}
                             </div>

@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/Button";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 const CATEGORIES = ["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"];
 
@@ -173,7 +174,7 @@ export default function ProductEditPage() {
                                 <div className="flex flex-wrap gap-3 mb-4">
                                     {images.map((img, idx) => (
                                         <div key={idx} className="relative group">
-                                            <img src={img.url} alt={`Product ${idx + 1}`} className="w-24 h-24 object-cover rounded-md border border-beige" />
+                                            <img src={getOptimizedImageUrl(img.url)} alt={`Product ${idx + 1}`} className="w-24 h-24 object-cover rounded-md border border-beige" />
                                             <button
                                                 type="button"
                                                 onClick={() => removeImage(idx)}

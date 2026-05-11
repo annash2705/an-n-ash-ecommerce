@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 export default function CartPage() {
     const { cartItems, addToCart, removeFromCart, cartTotal } = useCart();
@@ -44,7 +45,7 @@ export default function CartPage() {
                                         <li key={item.product} className="py-6 flex sm:py-10">
                                             <div className="flex-shrink-0 w-24 h-24 sm:w-32 sm:h-32 bg-white rounded-md overflow-hidden border border-beige">
                                                 <img
-                                                    src={item.image}
+                                                    src={getOptimizedImageUrl(item.image)}
                                                     alt={item.name}
                                                     className="w-full h-full object-cover object-center"
                                                 />

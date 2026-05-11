@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { ProductCard } from "@/components/ui/ProductCard";
 import api from "@/lib/axios";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 import { useSearchParams } from "next/navigation";
 
 export default function ShopPage() {
@@ -34,7 +35,7 @@ function ShopContent() {
                 if (allProducts && allProducts.length > 0) {
                     const formatted = allProducts.map((p: any) => ({
                         ...p,
-                        image: p.images && p.images.length > 0 ? p.images[0].url : "https://via.placeholder.com/800x1000?text=No+Image"
+                        image: p.images && p.images.length > 0 ? getOptimizedImageUrl(p.images[0].url) : "https://via.placeholder.com/800x1000?text=No+Image"
                     }));
                     setProducts(formatted);
                 } else {

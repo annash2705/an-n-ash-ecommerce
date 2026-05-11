@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
+import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
 export default async function Home() {
   // Fetch latest products directly from our backend API
@@ -82,7 +83,7 @@ export default async function Home() {
                 <Link href={`/product/${product._id}`} key={product._id} className="group cursor-pointer">
                   <div className="relative aspect-[3/4] mb-4 overflow-hidden rounded-t-full rounded-b-xl shadow-sm bg-white">
                     <img
-                      src={product.images && product.images.length > 0 ? product.images[0].url : "https://via.placeholder.com/800x1200?text=No+Image"}
+                      src={product.images && product.images.length > 0 ? getOptimizedImageUrl(product.images[0].url) : "https://via.placeholder.com/800x1200?text=No+Image"}
                       alt={product.name}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-700"
                     />
