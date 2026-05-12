@@ -8,7 +8,14 @@ import { useSearchParams } from "next/navigation";
 
 export default function ShopPage() {
     return (
-        <Suspense fallback={<div className="bg-cream min-h-screen flex items-center justify-center"><div className="animate-pulse text-gold text-lg">Loading collection...</div></div>}>
+        <Suspense fallback={
+            <div className="bg-cream min-h-screen flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-8 h-8 border-2 border-gold/30 border-t-gold rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-gold/60 tracking-widest text-sm uppercase">Loading collection...</p>
+                </div>
+            </div>
+        }>
             <ShopContent />
         </Suspense>
     );
@@ -89,37 +96,45 @@ function ShopContent() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
                 {/* Header */}
-                <div className="text-center mb-16">
-                    <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-4">Our Collection</h1>
-                    <p className="text-foreground max-w-2xl mx-auto">
-                        Discover handmade jewelry inspired by art, nature, and magic.
+                <div className="text-center mb-14">
+                    <p className="text-gold tracking-[0.3em] text-xs uppercase mb-3">✦ Our Collection ✦</p>
+                    <h1 className="text-4xl md:text-5xl font-serif text-foreground mb-4">Discover Magic</h1>
+                    <p className="text-foreground/60 max-w-2xl mx-auto leading-relaxed">
+                        Handmade jewelry inspired by art, nature, and the enchanting beauty of the everyday.
                     </p>
+                    <div className="gold-divider mt-6">
+                        <div className="gold-divider-gem" />
+                    </div>
                 </div>
 
                 {/* Search Bar */}
-                <div className="mb-8 max-w-xl mx-auto">
+                <div className="mb-10 max-w-xl mx-auto">
                     <input
                         type="text"
                         placeholder="Search jewelry by name..."
                         value={searchKeyword}
                         onChange={(e) => setSearchKeyword(e.target.value)}
-                        className="w-full border border-beige rounded-full px-6 py-3 text-sm focus:outline-none focus:border-gold bg-white shadow-sm placeholder-gray-400"
+                        className="input-elegant w-full rounded-full px-7 py-3.5 text-sm shadow-sm"
                     />
                 </div>
 
-                <div className="flex flex-col md:flex-row gap-8">
+                <div className="flex flex-col md:flex-row gap-10">
                     {/* Sidebar Filters */}
-                    <div className="w-full md:w-64 flex-shrink-0">
+                    <div className="w-full md:w-60 flex-shrink-0">
                         <div className="sticky top-28 space-y-8">
 
                             <div>
-                                <h3 className="font-serif text-lg text-foreground mb-4 border-b border-beige pb-2">Categories</h3>
-                                <ul className="space-y-2">
+                                <h3 className="font-serif text-base text-gold uppercase tracking-[0.15em] mb-4 pb-2 border-b border-gold-light/30">Categories</h3>
+                                <ul className="space-y-1.5">
                                     {categories.map(c => (
                                         <li key={c}>
                                             <button
                                                 onClick={() => setCategory(c)}
-                                                className={`text-sm tracking-wide ${category === c ? 'text-gold-dark font-semibold' : 'text-foreground hover:text-gold'} transition`}
+                                                className={`w-full text-left text-sm tracking-wide px-3 py-2 rounded-lg transition-all duration-300 ${
+                                                    category === c 
+                                                        ? 'text-gold bg-gold/5 font-semibold' 
+                                                        : 'text-foreground/70 hover:text-gold hover:bg-gold/5'
+                                                }`}
                                             >
                                                 {c}
                                             </button>
@@ -129,11 +144,11 @@ function ShopContent() {
                             </div>
 
                             <div>
-                                <h3 className="font-serif text-lg text-foreground mb-4 border-b border-beige pb-2">Sort By</h3>
+                                <h3 className="font-serif text-base text-gold uppercase tracking-[0.15em] mb-4 pb-2 border-b border-gold-light/30">Sort By</h3>
                                 <select
                                     value={sort}
                                     onChange={(e) => setSort(e.target.value)}
-                                    className="w-full bg-white border border-beige rounded-sm p-2 text-sm focus:outline-none focus:border-gold"
+                                    className="input-elegant text-sm"
                                 >
                                     <option value="newest">Newest Arrivals</option>
                                     <option value="price-low">Price: Low to High</option>
@@ -147,32 +162,34 @@ function ShopContent() {
 
                     {/* Product Grid */}
                     <div className="flex-grow">
-                        <div className="flex justify-between items-center mb-6">
-                            <p className="text-sm text-foreground">Showing {filteredProducts.length} results for {category === 'All' ? 'everything' : category}</p>
+                        <div className="flex justify-between items-center mb-8">
+                            <p className="text-sm text-foreground/50 tracking-wide">
+                                {filteredProducts.length} {filteredProducts.length === 1 ? 'piece' : 'pieces'} {category !== 'All' ? `in ${category}` : ''}
+                            </p>
                         </div>
 
                         {loading ? (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                 {[1, 2, 3, 4, 5, 6].map(i => (
-                                    <div key={i} className="bg-white border border-beige rounded-xl overflow-hidden animate-pulse">
-                                        <div className="aspect-[4/5] bg-beige"></div>
+                                    <div key={i} className="card-premium overflow-hidden animate-pulse">
+                                        <div className="aspect-[4/5] bg-beige/60" />
                                         <div className="p-5 space-y-3">
-                                            <div className="h-3 bg-beige rounded w-1/3 mx-auto"></div>
-                                            <div className="h-4 bg-beige rounded w-2/3 mx-auto"></div>
-                                            <div className="h-4 bg-beige rounded w-1/4 mx-auto"></div>
+                                            <div className="h-3 bg-beige/60 rounded-full w-1/3 mx-auto" />
+                                            <div className="h-4 bg-beige/60 rounded-full w-2/3 mx-auto" />
+                                            <div className="h-4 bg-beige/60 rounded-full w-1/4 mx-auto" />
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : error ? (
-                            <div className="text-center py-20 bg-white border border-beige rounded-xl">
-                                <p className="text-red-500 text-lg mb-4">{error}</p>
-                                <button onClick={() => window.location.reload()} className="text-gold hover:underline">Try Again</button>
+                            <div className="text-center py-20 card-premium">
+                                <p className="text-red-400 text-lg mb-4">{error}</p>
+                                <button onClick={() => window.location.reload()} className="text-gold hover:text-gold-dark transition-colors underline underline-offset-4">Try Again</button>
                             </div>
                         ) : filteredProducts.length === 0 ? (
-                            <div className="text-center py-20 bg-white border border-beige rounded-xl">
-                                <p className="text-foreground text-lg">No pieces found matching your criteria.</p>
-                                <button onClick={() => { setCategory('All'); setSort('newest'); setSearchKeyword(''); }} className="mt-4 text-gold hover:underline">Clear Filters</button>
+                            <div className="text-center py-20 card-premium">
+                                <p className="text-foreground/60 text-lg font-light italic mb-4">No pieces found matching your criteria.</p>
+                                <button onClick={() => { setCategory('All'); setSort('newest'); setSearchKeyword(''); }} className="text-gold hover:text-gold-dark transition-colors underline underline-offset-4">Clear Filters</button>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

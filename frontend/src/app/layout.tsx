@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Playfair_Display } from "next/font/google";
+import { Cormorant_Garamond, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { CartProvider } from "@/context/CartContext";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const cormorant = Cormorant_Garamond({
+  variable: "--font-cormorant",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 const playfair = Playfair_Display({
@@ -17,8 +18,8 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "An.n.Ash | Handmade Jewelry",
-  description: "Ethereal, whimsical, and artistic handmade jewelry",
+  title: "An.n.Ash | Wired Jewellery by San",
+  description: "Ethereal, whimsical handmade wired jewelry — crafted with magic, inspired by nature and fairy tales.",
 };
 
 export default function RootLayout({
@@ -29,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${playfair.variable} antialiased flex flex-col min-h-screen`}
+        className={`${cormorant.variable} ${playfair.variable} antialiased flex flex-col min-h-screen`}
       >
         <AuthProvider>
           <CartProvider>

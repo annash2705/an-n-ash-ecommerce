@@ -18,19 +18,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         },
         ref
     ) => {
-        const baseStyles = 'inline-flex items-center justify-center rounded-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-gold focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+        const baseStyles = 'inline-flex items-center justify-center font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gold/30 focus:ring-offset-2 focus:ring-offset-cream disabled:opacity-50 disabled:pointer-events-none cursor-pointer';
 
         const variants = {
-            primary: 'bg-gold text-white hover:bg-gold-dark shadow-sm',
-            secondary: 'bg-pink-soft text-foreground hover:bg-pink-200',
-            outline: 'border border-gold text-gold hover:bg-gold hover:text-white',
-            ghost: 'hover:bg-beige text-foreground',
+            primary: 'bg-gradient-to-r from-gold to-gold-dark text-white hover:shadow-[0_4px_20px_rgba(196,154,60,0.3)] hover:brightness-110 rounded-full',
+            secondary: 'bg-pink-blush text-foreground hover:bg-pink-soft rounded-full',
+            outline: 'border border-gold/50 text-gold hover:bg-gold hover:text-white rounded-full hover:shadow-[0_4px_16px_rgba(196,154,60,0.2)]',
+            ghost: 'hover:bg-beige/60 text-foreground rounded-lg',
         };
 
         const sizes = {
-            sm: 'h-9 px-3 text-sm',
-            md: 'h-10 py-2 px-4',
-            lg: 'h-12 px-8 text-lg',
+            sm: 'h-9 px-5 text-xs tracking-wider',
+            md: 'h-10 py-2 px-6 text-sm tracking-wide',
+            lg: 'h-12 px-10 text-sm tracking-[0.15em] uppercase',
         };
 
         const widthClass = fullWidth ? 'w-full' : '';

@@ -1,30 +1,417 @@
 @import "tailwindcss";
 
 @theme {
-  --color-cream: #FDFBF7;
-  --color-beige: #F5EFEB;
-  --color-pink-soft: #F9E5E6;
-  --color-gold: #D4AF37;
-  --color-gold-dark: #B5952F;
-  --color-foreground: #2D2A26;
+  --color-cream: #FDF6EE;
+  --color-ivory: #FAF3EB;
+  --color-beige: #F0E6D9;
+  --color-pink-soft: #F2C6C8;
+  --color-pink-blush: #FADDE1;
+  --color-gold: #C49A3C;
+  --color-gold-dark: #A67C2E;
+  --color-gold-light: #E8D5A3;
+  --color-sage: #8B9E6B;
+  --color-foreground: #3A2F28;
   --color-background: var(--color-cream);
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-cormorant), ui-serif, Georgia, serif;
   --font-serif: var(--font-playfair), ui-serif, Georgia, serif;
 }
 
 :root {
-  --background: #FDFBF7;
-  --foreground: #2D2A26;
+  --background: #FDF6EE;
+  --foreground: #3A2F28;
 }
+
+/* ═══════════════════════════════════════
+   BASE STYLES
+   ═══════════════════════════════════════ */
 
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.7;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-serif);
   font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════ */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FAF3EB;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #C49A3C, #E8D5A3);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #A67C2E;
+}
+
+/* ═══════════════════════════════════════
+   SELECTION
+   ═══════════════════════════════════════ */
+
+::selection {
+  background-color: #FADDE1;
+  color: #3A2F28;
+}
+
+/* ═══════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════ */
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(2deg); }
+  66% { transform: translateY(-4px) rotate(-1deg); }
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(180deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(196, 154, 60, 0.1); }
+  50% { box-shadow: 0 0 20px rgba(196, 154, 60, 0.2), 0 0 40px rgba(196, 154, 60, 0.05); }
+}
+
+@keyframes gentleRotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes butterflySway {
+  0%, 100% { transform: translateY(0) rotate(-5deg); }
+  25% { transform: translateY(-6px) rotate(3deg); }
+  50% { transform: translateY(-2px) rotate(-3deg); }
+  75% { transform: translateY(-8px) rotate(5deg); }
+}
+
+@keyframes realBlink {
+  0%, 100% { opacity: 0; }
+  /* Blink happens early in cycle */
+  18% { opacity: 0; }
+  21% { opacity: 0.8; }
+  23% { opacity: 1; }
+  26% { opacity: 1; }
+  29% { opacity: 0.5; }
+  32% { opacity: 0; }
+  /* Quick double-blink */
+  38% { opacity: 0; }
+  40% { opacity: 1; }
+  43% { opacity: 1; }
+  46% { opacity: 0; }
+  47%, 100% { opacity: 0; }
+}
+
+@keyframes wingFlap {
+  0%, 100% { opacity: 0; }
+  /* Wings flap later in cycle so they offset from blink */
+  55% { opacity: 0; }
+  58% { opacity: 0.7; }
+  60% { opacity: 1; }
+  64% { opacity: 1; }
+  67% { opacity: 0.5; }
+  70% { opacity: 0; }
+  /* Quick second flap */
+  74% { opacity: 0; }
+  76% { opacity: 1; }
+  79% { opacity: 1; }
+  82% { opacity: 0; }
+  /* Tiny flutter */
+  86% { opacity: 0; }
+  87.5% { opacity: 0.7; }
+  89% { opacity: 0.7; }
+  91% { opacity: 0; }
+  92%, 100% { opacity: 0; }
+}
+
+@keyframes drift1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(40px, -30px) scale(1.1); }
+  50% { transform: translate(-20px, -50px) scale(0.9); }
+  75% { transform: translate(30px, 20px) scale(1.05); }
+}
+
+@keyframes drift2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(-50px, 20px) scale(1.15); }
+  50% { transform: translate(30px, 40px) scale(0.85); }
+  75% { transform: translate(-20px, -30px) scale(1.1); }
+}
+
+@keyframes drift3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  30% { transform: translate(35px, 25px) scale(1.1); }
+  60% { transform: translate(-45px, -15px) scale(0.95); }
+  80% { transform: translate(15px, -35px) scale(1.05); }
+}
+
+/* ═══════════════════════════════════════
+   UTILITY CLASSES
+   ═══════════════════════════════════════ */
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out both;
+}
+
+.animate-fade-in-up-delay {
+  animation: fadeInUp 0.8s ease-out 0.2s both;
+}
+
+.animate-fade-in-up-delay-2 {
+  animation: fadeInUp 0.8s ease-out 0.4s both;
+}
+
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.animate-float-slow {
+  animation: floatSlow 8s ease-in-out infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(196, 154, 60, 0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+
+.animate-twinkle {
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.animate-butterfly {
+  animation: butterflySway 4s ease-in-out infinite;
+}
+
+.animate-real-blink {
+  animation: realBlink 4s ease-in-out infinite;
+}
+
+.animate-wing-flap {
+  animation: wingFlap 3s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════
+   DECORATIVE ELEMENTS
+   ═══════════════════════════════════════ */
+
+/* Golden flourish divider */
+.gold-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 2rem auto;
+  max-width: 300px;
+}
+
+.gold-divider::before,
+.gold-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #C49A3C, transparent);
+}
+
+.gold-divider-gem {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #F2C6C8, #C49A3C);
+  transform: rotate(45deg);
+  flex-shrink: 0;
+  box-shadow: 0 0 8px rgba(196, 154, 60, 0.3);
+}
+
+/* Sparkle star decoration */
+.sparkle-star {
+  position: relative;
+  display: inline-block;
+}
+
+.sparkle-star::before {
+  content: '✦';
+  position: absolute;
+  color: #C49A3C;
+  font-size: 12px;
+  animation: twinkle 2s ease-in-out infinite;
+  top: -8px;
+  right: -14px;
+}
+
+/* Section with watercolor background */
+.watercolor-bg {
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(250, 221, 225, 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 30%, rgba(232, 213, 163, 0.2) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(242, 198, 200, 0.15) 0%, transparent 50%),
+    var(--background);
+}
+
+/* Gold shimmer card border */
+.card-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-shimmer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(196, 154, 60, 0.08), transparent);
+  transition: left 0.8s ease;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.card-shimmer:hover::before {
+  left: 100%;
+}
+
+/* Premium card style */
+.card-premium {
+  background: #FAF3EB;
+  border: 1px solid #F0E6D9;
+  border-radius: 16px;
+  box-shadow: 
+    0 1px 3px rgba(196, 154, 60, 0.04),
+    0 4px 12px rgba(196, 154, 60, 0.04);
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-premium:hover {
+  border-color: rgba(196, 154, 60, 0.3);
+  box-shadow: 
+    0 4px 12px rgba(196, 154, 60, 0.08),
+    0 12px 32px rgba(196, 154, 60, 0.06);
+  transform: translateY(-2px);
+}
+
+/* Elegant input styling */
+.input-elegant {
+  width: 100%;
+  border: 1px solid #F0E6D9;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-family: var(--font-sans);
+  color: #3A2F28;
+  background: #FAF3EB;
+  transition: all 0.3s ease;
+}
+
+.input-elegant:focus {
+  outline: none;
+  border-color: #C49A3C;
+  box-shadow: 0 0 0 3px rgba(196, 154, 60, 0.1);
+  background: white;
+}
+
+.input-elegant::placeholder {
+  color: #B5A898;
+}
+
+/* Hero gradient overlay */
+.hero-gradient {
+  background: 
+    radial-gradient(ellipse at 30% 20%, rgba(250, 221, 225, 0.5) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 80%, rgba(232, 213, 163, 0.4) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(242, 198, 200, 0.2) 0%, transparent 70%),
+    linear-gradient(180deg, #FDF6EE 0%, #FAF3EB 100%);
+}
+
+/* Gold text gradient */
+.text-gold-gradient {
+  background: linear-gradient(135deg, #C49A3C 0%, #E8D5A3 40%, #C49A3C 70%, #A67C2E 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Butterfly SVG decoration */
+.butterfly-decoration {
+  position: absolute;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+/* Nav link with underline animation */
+.nav-link-fancy {
+  position: relative;
+  transition: color 0.3s ease;
+}
+
+.nav-link-fancy::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  width: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #C49A3C, transparent);
+  transition: all 0.4s ease;
+  transform: translateX(-50%);
+}
+
+.nav-link-fancy:hover::after {
+  width: 100%;
+}
+
+/* Footer flourish */
+.footer-flourish {
+  background: 
+    radial-gradient(ellipse at 50% 0%, rgba(196, 154, 60, 0.06) 0%, transparent 70%),
+    #FDF6EE;
 }
