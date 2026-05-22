@@ -6,7 +6,9 @@ export default async function Home() {
   // Fetch latest products directly from our backend API
   let featuredProducts = [];
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/products`, {
+    const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    const cleanUrl = rawUrl.replace(/\\r\\n|\\n|\\r/g, '').trim();
+    const res = await fetch(`${cleanUrl}/products`, {
       cache: 'no-store'
     });
     if (res.ok) {

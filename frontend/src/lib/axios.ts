@@ -1,7 +1,12 @@
 import axios from 'axios';
 
+const getCleanApiUrl = () => {
+    const rawUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+    return rawUrl.replace(/\\r\\n|\\n|\\r/g, '').trim();
+};
+
 const api = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
+    baseURL: getCleanApiUrl(),
 });
 
 // Request interceptor for adding the auth token

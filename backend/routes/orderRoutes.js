@@ -10,7 +10,8 @@ const {
     createRazorpayOrder,
     verifyRazorpayPayment,
     getAdminStats,
-    generateShiprocketLabel
+    generateShiprocketLabel,
+    retryShiprocketFulfillment
 } = require("../controllers/orderController");
 const { protect, admin } = require("../middlewares/authMiddleware");
 
@@ -23,5 +24,6 @@ router.route("/:id/verify").post(protect, verifyRazorpayPayment);
 router.route("/:id/status").put(protect, admin, updateOrderStatus);
 router.route("/:id/cancel").put(protect, cancelOrder);
 router.route("/:id/generate-label").post(protect, admin, generateShiprocketLabel);
+router.route("/:id/retry-fulfillment").post(protect, admin, retryShiprocketFulfillment);
 
 module.exports = router;

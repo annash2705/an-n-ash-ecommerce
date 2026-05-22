@@ -11,6 +11,7 @@ export default function AdminOrdersPage() {
 
     // Track which orders have had their labels "printed" in this session
     const [printedLabels, setPrintedLabels] = useState<Record<string, boolean>>({});
+    const [retryingFulfillment, setRetryingFulfillment] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
         fetchOrders();
@@ -54,6 +55,20 @@ export default function AdminOrdersPage() {
         alert("Order marked as Picked Up! Customer tracking updated.");
     };
 
+    const handleRetryFulfillment = async (id: string) => {
+        setRetryingFulfillment(prev => ({ ...prev, [id]: true }));
+        try {
+            await api.post(`/orders/${id}/retry-fulfillment`);
+            alert("Shiprocket fulfillment successful! Shipment created.");
+            fetchOrders();
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.message || "Failed to create shipment. Make sure your Shiprocket dashboard settings are correct.";
+            alert(errorMsg);
+        } finally {
+            setRetryingFulfillment(prev => ({ ...prev, [id]: false }));
+        }
+    };
+
     // Filter orders based on active tab
     const displayedOrders = orders.filter((order: any) =>
         activeTab === 'pending'
@@ -70,7 +85,16 @@ export default function AdminOrdersPage() {
 
         // No shipment ID — can't print label (old order or Shiprocket failed)
         if (!order.shipmentId) {
-            return <span className="text-xs text-gray-400 italic">No shipment</span>;
+            return (
+                <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleRetryFulfillment(order._id)}
+                    disabled={retryingFulfillment[order._id]}
+                >
+                    {retryingFulfillment[order._id] ? "Creating..." : "Create Shipment"}
+                </Button>
+            );
         }
 
         // Label already printed this session

@@ -351,6 +351,42 @@ const generateShiprocketLabel = async (req, res) => {
     }
 };
 
+// @desc    Retry Shiprocket fulfillment for an order
+// @route   POST /api/orders/:id/retry-fulfillment
+// @access  Private/Admin
+const retryShiprocketFulfillment = async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ message: "Order not found" });
+        }
+
+        if (order.shipmentId) {
+            return res.status(400).json({ message: "Shipment already exists for this order." });
+        }
+
+        // Must be paid or Cash on Delivery
+        if (order.paymentMethod === "Razorpay" && !order.isPaid) {
+            return res.status(400).json({ message: "Cannot fulfill unpaid Razorpay order." });
+        }
+
+        const fulfillment = await processShiprocketFulfillment(order);
+        if (fulfillment) {
+            if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
+            if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
+            if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+            
+            const updatedOrder = await order.save();
+            res.json(updatedOrder);
+        } else {
+            res.status(400).json({ message: "Shiprocket order creation returned empty response." });
+        }
+    } catch (error) {
+        console.error("DEBUG RETRY FULFILLMENT ERROR: ", error);
+        res.status(500).json({ message: error.message || "Shiprocket fulfillment failed." });
+    }
+};
+
 module.exports = {
     addOrderItems,
     getOrderById,
@@ -362,5 +398,6 @@ module.exports = {
     verifyRazorpayPayment,
     getRazorpayClientId,
     getAdminStats,
-    generateShiprocketLabel
+    generateShiprocketLabel,
+    retryShiprocketFulfillment
 };
