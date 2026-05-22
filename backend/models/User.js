@@ -29,13 +29,31 @@ const userSchema = new mongoose.Schema(
         phone: {
             type: String,
         },
+        isEmailVerified: {
+            type: Boolean,
+            default: false,
+        },
+        emailVerificationCode: {
+            type: String,
+        },
+        isPhoneVerified: {
+            type: Boolean,
+            default: false,
+        },
+        phoneVerificationCode: {
+            type: String,
+        },
         addresses: [
             {
+                name: String,
+                phone: String,
+                email: String,
                 street: String,
                 city: String,
                 state: String,
                 pincode: String,
                 country: { type: String, default: "India" },
+                isDefault: { type: Boolean, default: false },
             },
         ],
     },
@@ -45,9 +63,9 @@ const userSchema = new mongoose.Schema(
 );
 
 // Encrypt password using bcrypt
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
     if (!this.isModified("password")) {
-        next();
+        return;
     }
 
     const salt = await bcrypt.genSalt(10);

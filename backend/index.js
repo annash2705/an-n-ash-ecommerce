@@ -1,4 +1,14 @@
 require("dotenv").config();
+// Set fallback DNS resolver for local development to avoid querySrv ECONNREFUSED with MongoDB Atlas
+if (process.env.NODE_ENV !== "production") {
+    const dns = require("dns");
+    try {
+        dns.setServers(["8.8.8.8", "8.8.4.4"]);
+    } catch (e) {
+        console.warn("Failed to set DNS servers:", e.message);
+    }
+}
+
 const express = require("express");
 const cors = require("cors");
 const rateLimit = require("express-rate-limit");
@@ -30,10 +40,10 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate limiting for auth routes
+// Rate limiting for auth routes (relaxed in non-production for testing)
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // limit each IP to 20 requests per windowMs
+    max: process.env.NODE_ENV === "production" ? 20 : 1000, // limit each IP to 20 in prod, 1000 in dev
     message: { message: "Too many attempts, please try again after 15 minutes" },
     standardHeaders: true,
     legacyHeaders: false,

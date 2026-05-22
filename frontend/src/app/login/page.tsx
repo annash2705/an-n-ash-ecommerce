@@ -35,6 +35,12 @@ function LoginContent() {
             const { data } = await api.post("/users/login", { email, password });
             login(data);
         } catch (err: any) {
+            if (err.response?.data?.requiresVerification) {
+                const info = err.response.data;
+                const targetStep = !info.isEmailVerified ? "verify-email" : "phone";
+                router.push(`/register?step=${targetStep}&userId=${info._id}&email=${encodeURIComponent(info.email)}&redirect=${encodeURIComponent(redirect)}`);
+                return;
+            }
             setError(err.response?.data?.message || "Something went wrong");
         } finally { setLoading(false); }
     };

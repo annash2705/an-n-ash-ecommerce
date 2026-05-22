@@ -33,6 +33,43 @@ const restoreStock = async (orderItems) => {
     }
 };
 
+// Helper: Automatically save address to user's profile if it's not already saved
+const autoSaveAddress = async (userId, shippingAddress) => {
+    try {
+        const User = require("../models/User");
+        const user = await User.findById(userId);
+        if (!user) return;
+
+        // Check if user already has an address with the same street, city, state, and pincode
+        const isDuplicate = user.addresses.some(
+            (addr) =>
+                addr.street?.trim().toLowerCase() === shippingAddress.street?.trim().toLowerCase() &&
+                addr.city?.trim().toLowerCase() === shippingAddress.city?.trim().toLowerCase() &&
+                addr.state?.trim().toLowerCase() === shippingAddress.state?.trim().toLowerCase() &&
+                addr.pincode?.trim().toLowerCase() === shippingAddress.pincode?.trim().toLowerCase()
+        );
+
+        if (!isDuplicate) {
+            // Check if this is the first address, make it default if so
+            const isFirst = user.addresses.length === 0;
+            user.addresses.push({
+                name: shippingAddress.name,
+                phone: shippingAddress.phone,
+                email: shippingAddress.email,
+                street: shippingAddress.street,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                pincode: shippingAddress.pincode,
+                country: shippingAddress.country || "India",
+                isDefault: isFirst
+            });
+            await user.save();
+        }
+    } catch (err) {
+        console.error("Failed to auto-save address:", err.message);
+    }
+};
+
 // @desc    Create new order
 // @route   POST /api/orders
 // @access  Private
@@ -75,6 +112,9 @@ const addOrderItems = async (req, res) => {
         });
 
         const createdOrder = await order.save();
+
+        // Auto-save address to user profile if it's unique
+        await autoSaveAddress(req.user._id, shippingAddress);
 
         // Decrement stock for all ordered items
         await decrementStock(orderItems);

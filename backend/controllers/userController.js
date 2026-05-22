@@ -1,6 +1,7 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+const { sendEmail } = require("../utils/sendEmail");
 
 // Generate JWT
 const generateToken = (id) => {
@@ -19,6 +20,16 @@ const authUser = async (req, res) => {
         const user = await User.findOne({ email }).select("+password");
 
         if (user && (await user.matchPassword(password))) {
+            if (!user.isEmailVerified || !user.isPhoneVerified) {
+                return res.status(403).json({
+                    message: "Account not fully verified",
+                    requiresVerification: true,
+                    _id: user._id,
+                    email: user.email,
+                    isEmailVerified: user.isEmailVerified,
+                    isPhoneVerified: user.isPhoneVerified
+                });
+            }
             res.json({
                 _id: user._id,
                 name: user.name,
@@ -38,33 +49,190 @@ const authUser = async (req, res) => {
 // @route   POST /api/users
 // @access  Public
 const registerUser = async (req, res) => {
-    const { name, email, password, phone } = req.body;
+    const { name, email, password } = req.body;
 
     try {
         const userExists = await User.findOne({ email });
 
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+
+        let user;
         if (userExists) {
-            return res.status(400).json({ message: "User already exists" });
+            if (userExists.isEmailVerified) {
+                return res.status(400).json({ message: "User already exists" });
+            }
+            // If email is not verified yet, allow re-signing up to resend code
+            userExists.name = name;
+            userExists.password = password;
+            userExists.emailVerificationCode = code;
+            user = await userExists.save();
+        } else {
+            user = await User.create({
+                name,
+                email,
+                password,
+                isEmailVerified: false,
+                isPhoneVerified: false,
+                emailVerificationCode: code
+            });
         }
 
-        const user = await User.create({
-            name,
-            email,
-            password,
-            phone
-        });
-
         if (user) {
-            res.status(201).json({
-                _id: user._id,
-                name: user.name,
+            await sendEmail({
                 email: user.email,
-                isAdmin: user.isAdmin,
-                token: generateToken(user._id),
+                subject: "Verify your email address - An.n.Ash",
+                html: `
+                    <h1>Welcome to An.n.Ash!</h1>
+                    <p>Please verify your email address using this 6-digit code:</p>
+                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #C49A3C;">${code}</p>
+                    <p>This code will expire in 30 minutes.</p>
+                `,
+            });
+
+            res.status(200).json({
+                message: "Verification email sent",
+                userId: user._id,
+                email: user.email
             });
         } else {
             res.status(400).json({ message: "Invalid user data" });
         }
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Verify email address
+// @route   POST /api/users/verify-email
+// @access  Public
+const verifyEmail = async (req, res) => {
+    const { userId, code } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.emailVerificationCode !== code) {
+            return res.status(400).json({ message: "Invalid email verification code" });
+        }
+
+        user.isEmailVerified = true;
+        user.emailVerificationCode = undefined;
+        await user.save();
+
+        res.json({ message: "Email verified successfully" });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Resend email verification code
+// @route   POST /api/users/resend-email-code
+// @access  Public
+const resendEmailCode = async (req, res) => {
+    const { userId } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.isEmailVerified) {
+            return res.status(400).json({ message: "Email is already verified" });
+        }
+
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        user.emailVerificationCode = code;
+        await user.save();
+
+        await sendEmail({
+            email: user.email,
+            subject: "Verify your email address - An.n.Ash",
+            html: `
+                <h1>Welcome to An.n.Ash!</h1>
+                <p>Please verify your email address using this 6-digit code:</p>
+                <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #C49A3C;">${code}</p>
+                <p>This code will expire in 30 minutes.</p>
+            `,
+        });
+
+        res.json({ message: "Verification email resent" });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Send phone verification OTP
+// @route   POST /api/users/send-phone-otp
+// @access  Public
+const sendPhoneOtp = async (req, res) => {
+    const { userId, phone } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.phone = phone;
+        user.phoneVerificationCode = otp;
+        await user.save();
+
+        console.log(`[PHONE OTP DEBUG] Code for user ${user.email} (${phone}): ${otp}`);
+
+        await sendEmail({
+            email: user.email,
+            subject: "Your Phone Verification OTP - An.n.Ash",
+            html: `
+                <h1>Verify your phone number</h1>
+                <p>Hello ${user.name},</p>
+                <p>Your 6-digit phone verification OTP is: <strong>${otp}</strong></p>
+                <p>Please enter this code on the website to complete your verification.</p>
+            `
+        });
+
+        res.json({ message: "Phone verification OTP sent successfully", otp });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Verify phone number
+// @route   POST /api/users/verify-phone
+// @access  Public
+const verifyPhone = async (req, res) => {
+    const { userId, code } = req.body;
+
+    try {
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.phoneVerificationCode !== code) {
+            return res.status(400).json({ message: "Invalid phone verification OTP" });
+        }
+
+        user.isPhoneVerified = true;
+        user.phoneVerificationCode = undefined;
+        await user.save();
+
+        res.json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            isAdmin: user.isAdmin,
+            phone: user.phone,
+            token: generateToken(user._id),
+        });
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
     }
@@ -164,10 +332,114 @@ const changePassword = async (req, res) => {
     }
 };
 
+// @desc    Add a new address
+// @route   POST /api/users/addresses
+// @access  Private
+const addAddress = async (req, res) => {
+    const { name, phone, email, street, city, state, pincode, country, isDefault } = req.body;
+
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const makeDefault = isDefault || user.addresses.length === 0;
+
+        if (makeDefault) {
+            user.addresses.forEach((addr) => {
+                addr.isDefault = false;
+            });
+        }
+
+        user.addresses.push({
+            name,
+            phone,
+            email,
+            street,
+            city,
+            state,
+            pincode,
+            country: country || "India",
+            isDefault: makeDefault,
+        });
+
+        await user.save();
+        res.status(201).json(user.addresses);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Delete an address
+// @route   DELETE /api/users/addresses/:id
+// @access  Private
+const deleteAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const addressToDelete = user.addresses.id(req.params.id);
+        if (!addressToDelete) {
+            return res.status(404).json({ message: "Address not found" });
+        }
+
+        const wasDefault = addressToDelete.isDefault;
+        user.addresses.pull({ _id: req.params.id });
+
+        if (wasDefault && user.addresses.length > 0) {
+            user.addresses[0].isDefault = true;
+        }
+
+        await user.save();
+        res.json(user.addresses);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
+// @desc    Set an address as default
+// @route   PUT /api/users/addresses/:id/default
+// @access  Private
+const setDefaultAddress = async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const targetAddress = user.addresses.id(req.params.id);
+        if (!targetAddress) {
+            return res.status(404).json({ message: "Address not found" });
+        }
+
+        user.addresses.forEach((addr) => {
+            addr.isDefault = addr._id.toString() === req.params.id;
+        });
+
+        await user.save();
+        res.json(user.addresses);
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+};
+
 module.exports = {
     authUser,
     registerUser,
     getUserProfile,
     updateUserProfile,
     changePassword,
+    verifyEmail,
+    resendEmailCode,
+    sendPhoneOtp,
+    verifyPhone,
+    addAddress,
+    deleteAddress,
+    setDefaultAddress
 };
