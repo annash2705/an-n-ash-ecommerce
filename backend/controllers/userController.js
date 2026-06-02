@@ -20,21 +20,12 @@ const authUser = async (req, res) => {
         const user = await User.findOne({ email }).select("+password");
 
         if (user && (await user.matchPassword(password))) {
-            if (!user.isEmailVerified || !user.isPhoneVerified) {
-                return res.status(403).json({
-                    message: "Account not fully verified",
-                    requiresVerification: true,
-                    _id: user._id,
-                    email: user.email,
-                    isEmailVerified: user.isEmailVerified,
-                    isPhoneVerified: user.isPhoneVerified
-                });
-            }
             res.json({
                 _id: user._id,
                 name: user.name,
                 email: user.email,
                 isAdmin: user.isAdmin,
+                phone: user.phone,
                 token: generateToken(user._id),
             });
         } else {
