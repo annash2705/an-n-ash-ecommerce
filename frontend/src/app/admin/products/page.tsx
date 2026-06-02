@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import api from "@/lib/axios";
 import { Button } from "@/components/ui/Button";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function AdminProductsPage() {
+    const router = useRouter();
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -26,8 +28,8 @@ export default function AdminProductsPage() {
 
     const createProductHandler = async () => {
         try {
-            await api.post("/products");
-            fetchProducts();
+            const { data } = await api.post("/products");
+            router.push(`/admin/products/${data._id}/edit`);
         } catch (error) {
             alert("Failed to create product");
         }

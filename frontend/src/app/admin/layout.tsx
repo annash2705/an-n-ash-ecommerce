@@ -7,20 +7,28 @@ import Link from "next/link";
 import { LayoutDashboard, ShoppingBag, ClipboardList, Inbox, LogOut, Menu, X } from "lucide-react";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const { user, logout } = useAuth();
+    const { user, loading, logout } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [mobileOpen, setMobileOpen] = useState(false);
 
     useEffect(() => {
-        if (!user || !user.isAdmin) {
+        if (!loading && (!user || !user.isAdmin)) {
             router.push("/login");
         }
-    }, [user, router]);
+    }, [user, loading, router]);
 
     useEffect(() => {
         setMobileOpen(false);
     }, [pathname]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-cream flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold"></div>
+            </div>
+        );
+    }
 
     if (!user || !user.isAdmin) return null;
 

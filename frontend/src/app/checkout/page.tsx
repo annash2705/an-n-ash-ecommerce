@@ -8,9 +8,27 @@ import { Button } from "@/components/ui/Button";
 import api from "@/lib/axios";
 import Script from "next/script";
 
+const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+        if (typeof window !== "undefined" && (window as any).Razorpay) {
+            resolve(true);
+            return;
+        }
+        const script = document.createElement("script");
+        script.src = "https://checkout.razorpay.com/v1/checkout.js";
+        script.onload = () => {
+            resolve(true);
+        };
+        script.onerror = () => {
+            resolve(false);
+        };
+        document.body.appendChild(script);
+    });
+};
+
 export default function CheckoutPage() {
     const router = useRouter();
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const { cartItems, cartTotal, clearCart } = useCart();
 
     const [address, setAddress] = useState({
@@ -37,6 +55,8 @@ export default function CheckoutPage() {
 
     // Protect route & load saved addresses
     useEffect(() => {
+        if (authLoading) return;
+
         if (!user) {
             router.push("/login?redirect=checkout");
             return;
@@ -62,7 +82,7 @@ export default function CheckoutPage() {
         };
 
         fetchSavedAddresses();
-    }, [user, router]);
+    }, [user, authLoading, router]);
 
     const selectAddressHandler = (addr: any) => {
         setSelectedAddressId(addr._id);
@@ -201,6 +221,12 @@ export default function CheckoutPage() {
             };
             const { data } = await api.post("/orders", orderData);
             if (paymentMethod === "Razorpay") {
+                const isLoaded = await loadRazorpayScript();
+                if (!isLoaded) {
+                    alert("Razorpay SDK failed to load. Are you online?");
+                    setLoading(false);
+                    return;
+                }
                 const { data: clientId } = await api.get("/config/razorpay");
                 if (!clientId || clientId.includes("your_razorpay")) { 
                     alert("Razorpay integration is incomplete."); 
@@ -244,6 +270,14 @@ export default function CheckoutPage() {
             setLoading(false); 
         }
     };
+
+    if (authLoading) {
+        return (
+            <div className="bg-cream min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold"></div>
+            </div>
+        );
+    }
 
     if (!user) return null;
 

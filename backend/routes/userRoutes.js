@@ -15,13 +15,14 @@ const {
     setDefaultAddress
 } = require("../controllers/userController");
 const { protect } = require("../middlewares/authMiddleware");
+const authLimiter = require("../middlewares/rateLimiter");
 
-router.post("/", registerUser);
-router.post("/login", authUser);
-router.post("/verify-email", verifyEmail);
-router.post("/resend-email-code", resendEmailCode);
-router.post("/send-phone-otp", sendPhoneOtp);
-router.post("/verify-phone", verifyPhone);
+router.post("/", authLimiter, registerUser);
+router.post("/login", authLimiter, authUser);
+router.post("/verify-email", authLimiter, verifyEmail);
+router.post("/resend-email-code", authLimiter, resendEmailCode);
+router.post("/send-phone-otp", authLimiter, sendPhoneOtp);
+router.post("/verify-phone", authLimiter, verifyPhone);
 router.route("/profile").get(protect, getUserProfile).put(protect, updateUserProfile);
 router.put("/password", protect, changePassword);
 

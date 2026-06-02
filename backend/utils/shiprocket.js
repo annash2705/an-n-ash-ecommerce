@@ -99,6 +99,24 @@ const generateAWB = async (shipmentId) => {
     }
 };
 
+const schedulePickup = async (shipmentId) => {
+    try {
+        const token = await getShiprocketToken();
+        const response = await axios.post(`${SHIPROCKET_API_BASE}/courier/generate/pickup`, {
+            shipment_id: [shipmentId]
+        }, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            },
+            timeout: 5000
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error scheduling pickup:", error.response ? JSON.stringify(error.response.data) : error.message);
+        return null;
+    }
+};
+
 const processShiprocketFulfillment = async (order) => {
     try {
         console.log(`Processing Shiprocket fulfillment for order ${order._id}`);
@@ -115,6 +133,15 @@ const processShiprocketFulfillment = async (order) => {
             let trackingId = null;
             if (awbRes && awbRes.response && awbRes.response.data && awbRes.response.data.awb_code) {
                 trackingId = awbRes.response.data.awb_code;
+
+                // 3. Automatically schedule pickup
+                try {
+                    console.log(`Scheduling Shiprocket pickup for shipment ${srOrder.shipment_id}`);
+                    const pickupRes = await schedulePickup(srOrder.shipment_id);
+                    console.log("SHIPROCKET PICKUP RAW RESPONSE:", JSON.stringify(pickupRes));
+                } catch (pickupErr) {
+                    console.error("Failed to auto-schedule pickup:", pickupErr.message);
+                }
             }
 
             return {
@@ -152,5 +179,6 @@ module.exports = {
     createShiprocketOrder,
     generateAWB,
     processShiprocketFulfillment,
-    generateLabel
+    generateLabel,
+    schedulePickup
 };

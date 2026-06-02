@@ -3,6 +3,7 @@ const Product = require("../models/Product");
 const CustomRequest = require("../models/CustomRequest");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
+const Settings = require("../models/Settings");
 const { processShiprocketFulfillment, generateLabel } = require("../utils/shiprocket");
 const { sendOrderConfirmationEmail } = require("../utils/sendEmail");
 
@@ -121,16 +122,31 @@ const addOrderItems = async (req, res) => {
 
         // If Cash on Delivery, trigger Shiprocket immediately since it's confirmed
         if (paymentMethod === "Cash on Delivery") {
+            // Check settings for automatic Shiprocket fulfillment
+            let isAutoShiprocket = true;
             try {
-                const fulfillment = await processShiprocketFulfillment(createdOrder);
-                if (fulfillment) {
-                    if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
-                    if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
-                    if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                    await createdOrder.save();
+                const autoSRSetting = await Settings.findOne({ key: "autoShiprocket" });
+                if (autoSRSetting && autoSRSetting.value === false) {
+                    isAutoShiprocket = false;
                 }
-            } catch (srErr) {
-                console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
+            } catch (err) {
+                console.error("Failed to read settings, defaulting to true:", err.message);
+            }
+
+            if (isAutoShiprocket) {
+                try {
+                    const fulfillment = await processShiprocketFulfillment(createdOrder);
+                    if (fulfillment) {
+                        if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
+                        if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
+                        if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                        await createdOrder.save();
+                    }
+                } catch (srErr) {
+                    console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
+                }
+            } else {
+                console.log("Automatic Shiprocket fulfillment is disabled (OFF). Skipping fulfillment for COD order.");
             }
 
             try {
@@ -217,16 +233,31 @@ const verifyRazorpayPayment = async (req, res) => {
                     update_time: Date.now().toString()
                 };
 
+                // Check settings for automatic Shiprocket fulfillment
+                let isAutoShiprocket = true;
                 try {
-                    // Trigger Shiprocket fulfillment for Prepaid orders
-                    const fulfillment = await processShiprocketFulfillment(order);
-                    if (fulfillment) {
-                        if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
-                        if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
-                        if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                    const autoSRSetting = await Settings.findOne({ key: "autoShiprocket" });
+                    if (autoSRSetting && autoSRSetting.value === false) {
+                        isAutoShiprocket = false;
                     }
-                } catch (shiprocketErr) {
-                    console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
+                } catch (err) {
+                    console.error("Failed to read settings, defaulting to true:", err.message);
+                }
+
+                if (isAutoShiprocket) {
+                    try {
+                        // Trigger Shiprocket fulfillment for Prepaid orders
+                        const fulfillment = await processShiprocketFulfillment(order);
+                        if (fulfillment) {
+                            if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
+                            if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
+                            if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                        }
+                    } catch (shiprocketErr) {
+                        console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
+                    }
+                } else {
+                    console.log("Automatic Shiprocket fulfillment is disabled (OFF). Skipping fulfillment for Prepaid order.");
                 }
 
                 const updatedOrder = await order.save();

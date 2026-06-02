@@ -14,18 +14,21 @@ interface User {
 
 interface AuthContextType {
     user: User | null;
+    loading: boolean;
     login: (userData: User) => void;
     logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
+    loading: true,
     login: () => { },
     logout: () => { },
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<User | null>(null);
+    const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
 
@@ -38,6 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         } catch (e) {
             // localStorage unavailable
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -57,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, [router]);
 
     return (
-        <AuthContext.Provider value={{ user: mounted ? user : null, login, logout }}>
+        <AuthContext.Provider value={{ user: mounted ? user : null, loading, login, logout }}>
             {children}
         </AuthContext.Provider>
     );

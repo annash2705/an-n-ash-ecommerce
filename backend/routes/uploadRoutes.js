@@ -3,7 +3,7 @@ const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("cloudinary").v2;
 const router = express.Router();
-const { protect, optionalAuth } = require("../middlewares/authMiddleware");
+const { protect } = require("../middlewares/authMiddleware");
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,

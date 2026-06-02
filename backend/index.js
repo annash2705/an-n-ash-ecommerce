@@ -11,7 +11,6 @@ if (process.env.NODE_ENV !== "production") {
 
 const express = require("express");
 const cors = require("cors");
-const rateLimit = require("express-rate-limit");
 const connectDB = require("./config/db");
 
 // Connect to database
@@ -40,14 +39,6 @@ app.use(cors({
 
 app.use(express.json());
 
-// Rate limiting for auth routes (relaxed in non-production for testing)
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: process.env.NODE_ENV === "production" ? 20 : 1000, // limit each IP to 20 in prod, 1000 in dev
-    message: { message: "Too many attempts, please try again after 15 minutes" },
-    standardHeaders: true,
-    legacyHeaders: false,
-});
 
 // Basic Route
 app.get("/", (req, res) => {
@@ -60,14 +51,16 @@ const productRoutes = require("./routes/productRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const customRequestRoutes = require("./routes/customRequestRoutes");
+const settingsRoutes = require("./routes/settingsRoutes");
 const { getRazorpayClientId } = require("./controllers/orderController");
 
 // Mount Routes
-app.use("/api/users", authLimiter, userRoutes);
+app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/custom-requests", customRequestRoutes);
+app.use("/api/settings", settingsRoutes);
 app.get("/api/config/razorpay", getRazorpayClientId);
 
 // 404 handler

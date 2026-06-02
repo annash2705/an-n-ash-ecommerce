@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
 export default function ProfilePage() {
-    const { user, logout, login } = useAuth();
+    const { user, loading: authLoading, logout, login } = useAuth();
     const router = useRouter();
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -50,6 +50,8 @@ export default function ProfilePage() {
     });
 
     useEffect(() => {
+        if (authLoading) return;
+
         if (!user) {
             router.push("/login?redirect=profile");
             return;
@@ -76,7 +78,7 @@ export default function ProfilePage() {
         };
 
         fetchInitialData();
-    }, [user, router]);
+    }, [user, authLoading, router]);
 
     const handleProfileUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -249,6 +251,14 @@ export default function ProfilePage() {
             alert("Failed to set default address");
         }
     };
+
+    if (authLoading) {
+        return (
+            <div className="bg-cream min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gold"></div>
+            </div>
+        );
+    }
 
     if (!user) return null;
 
