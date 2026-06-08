@@ -534,24 +534,7 @@ const retryShiprocketFulfillment = async (req, res) => {
     }
 };
 
-module.exports = {
-    addOrderItems,
-    getOrderById,
-    updateOrderStatus,
-    cancelOrder,
-    getMyOrders,
-    getOrders,
-    createRazorpayOrder,
-    verifyRazorpayPayment,
-    getRazorpayClientId,
-    getAdminStats,
-    generateShiprocketLabel,
-    retryShiprocketFulfillment,
-    requestOrderReturn,
-    resolveOrderReturn,
-    createCustomFulfillment,
-    trackAWBStatus
-};
+
 
 // @desc    Customer request return
 // @route   PUT /api/orders/:id/return-request
@@ -802,4 +785,23 @@ const trackAWBStatus = async (req, res) => {
         console.error("Track AWB error:", error.message);
         res.status(500).json({ message: "Server error querying tracking", error: error.message });
     }
+};
+
+module.exports = {
+    addOrderItems,
+    getOrderById,
+    updateOrderStatus,
+    cancelOrder,
+    getMyOrders,
+    getOrders,
+    createRazorpayOrder,
+    verifyRazorpayPayment,
+    getRazorpayClientId,
+    getAdminStats,
+    generateShiprocketLabel,
+    retryShiprocketFulfillment,
+    requestOrderReturn,
+    resolveOrderReturn,
+    createCustomFulfillment,
+    trackAWBStatus
 };
