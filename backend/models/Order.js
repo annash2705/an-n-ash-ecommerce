@@ -65,7 +65,20 @@ const orderSchema = new mongoose.Schema(
         },
         orderStatus: {
             type: String,
-            enum: ["order placed", "processing", "packed", "shipped", "out for delivery", "delivered", "cancelled"],
+            enum: [
+                "order placed", 
+                "processing", 
+                "packed", 
+                "shipped", 
+                "out for delivery", 
+                "delivered", 
+                "cancelled",
+                "return requested",
+                "return approved",
+                "return rejected",
+                "return picked up",
+                "returned"
+            ],
             default: "order placed",
         },
         isDelivered: {
@@ -84,6 +97,30 @@ const orderSchema = new mongoose.Schema(
         },
         shiprocketOrderId: {
             type: String,
+        },
+        courierName: {
+            type: String,
+        },
+        trackingUrl: {
+            type: String,
+        },
+        orderTimeline: [
+            {
+                status: { type: String, required: true },
+                timestamp: { type: Date, default: Date.now },
+                description: { type: String }
+            }
+        ],
+        returnDetails: {
+            isRequested: { type: Boolean, default: false },
+            reason: { type: String },
+            status: { type: String, enum: ["Pending", "Approved", "Rejected", "Pickup Scheduled", "Completed"], default: "Pending" },
+            requestedAt: { type: Date },
+            resolvedAt: { type: Date },
+            reverseShipmentId: { type: String },
+            reverseAwbCode: { type: String },
+            refundStatus: { type: String, enum: ["Pending", "Refunded", "N/A"], default: "N/A" },
+            refundAmount: { type: Number, default: 0 }
         }
     },
     {

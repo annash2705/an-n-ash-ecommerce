@@ -14,10 +14,10 @@ const getShiprocketToken = async () => {
         const response = await axios.post(`${SHIPROCKET_API_BASE}/auth/login`, {
             email: process.env.SHIPROCKET_EMAIL,
             password: process.env.SHIPROCKET_PASSWORD,
-        }, { timeout: 5000 });
+        }, { timeout: 8000 });
 
         shiprocketToken = response.data.token;
-        // Token roughly expires in 10 days; we set it to 9 days to be safe
+        // Token roughly expires in 10 days; set to 9 days to be safe
         tokenExpiry = Date.now() + (9 * 24 * 60 * 60 * 1000);
         return shiprocketToken;
     } catch (error) {
@@ -26,15 +26,190 @@ const getShiprocketToken = async () => {
     }
 };
 
+const executeWithRetry = async (fn, retries = 3, delay = 1000) => {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            return await fn();
+        } catch (error) {
+            if (attempt === retries) throw error;
+            console.warn(`Shiprocket API attempt ${attempt} failed. Retrying in ${delay}ms...`, error.message);
+            await new Promise(res => setTimeout(res, delay));
+            delay *= 2; // exponential backoff
+        }
+    }
+};
+
+const logShiprocketAction = async (endpoint, method, requestPayload, responsePayload, statusCode, orderId, errorMessage = null) => {
+    try {
+        const ShiprocketLog = require("../models/ShiprocketLog");
+        const status = statusCode >= 200 && statusCode < 300 ? "Success" : "Failed";
+        await ShiprocketLog.create({
+            endpoint,
+            method,
+            requestPayload,
+            responsePayload,
+            statusCode,
+            status,
+            errorMessage,
+            orderId: orderId || null
+        });
+    } catch (err) {
+        console.error("Failed to write Shiprocket log to DB:", err.message);
+    }
+};
+
+const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => {
+    try {
+        const token = await getShiprocketToken();
+        const Settings = require("../models/Settings");
+        const Product = require("../models/Product");
+
+        // Load shipping settings
+        let settings = {
+            pickupPostcode: "110001",
+            pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
+            defaultWeight: 0.1,
+            defaultLength: 10,
+            defaultWidth: 10,
+            defaultHeight: 10
+        };
+        const settingsDoc = await Settings.findOne({ key: "shippingSettings" });
+        if (settingsDoc && settingsDoc.value) {
+            settings = { ...settings, ...settingsDoc.value };
+        }
+
+        // Calculate package weight and dimensions
+        let totalWeight = 0;
+        let maxLength = 0;
+        let maxWidth = 0;
+        let totalHeight = 0;
+
+        for (const item of items) {
+            const product = await Product.findById(item.product);
+            const qty = item.qty || 1;
+            
+            const shippingConfig = product?.shippingConfig || {};
+            const itemWeight = (shippingConfig.weight || settings.defaultWeight) * qty;
+            totalWeight += itemWeight;
+
+            // Simple packaging dimensions heuristics
+            maxLength = Math.max(maxLength, shippingConfig.length || settings.defaultLength);
+            maxWidth = Math.max(maxWidth, shippingConfig.width || settings.defaultWidth);
+            totalHeight += (shippingConfig.height || settings.defaultHeight) * qty;
+        }
+
+        // Constraints
+        totalWeight = Math.max(0.1, totalWeight); // min 100 grams
+        maxLength = Math.max(10, maxLength);
+        maxWidth = Math.max(10, maxWidth);
+        totalHeight = Math.max(10, totalHeight);
+
+        const codVal = paymentMethod === "Cash on Delivery" ? 1 : 0;
+
+        const url = `${SHIPROCKET_API_BASE}/courier/serviceability/?pickup_postcode=${settings.pickupPostcode}&delivery_postcode=${deliveryPincode}&weight=${totalWeight}&cod=${codVal}&length=${maxLength}&width=${maxWidth}&height=${totalHeight}`;
+        
+        console.log(`Checking Shiprocket rate availability: ${url}`);
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            },
+            timeout: 8000
+        });
+
+        await logShiprocketAction(
+            "/courier/serviceability/", 
+            "GET", 
+            { deliveryPincode, weight: totalWeight, cod: codVal }, 
+            response.data, 
+            response.status, 
+            null
+        );
+
+        if (response.data && response.data.status === 200 && response.data.data) {
+            return {
+                serviceable: true,
+                rates: response.data.data.available_courier_companies,
+                weight: totalWeight,
+                dimensions: { length: maxLength, width: maxWidth, height: totalHeight }
+            };
+        }
+
+        return { serviceable: false, rates: [], weight: totalWeight, dimensions: { length: maxLength, width: maxWidth, height: totalHeight } };
+    } catch (error) {
+        console.error("Error calculating shipping rates:", error.response ? JSON.stringify(error.response.data) : error.message);
+        await logShiprocketAction(
+            "/courier/serviceability/", 
+            "GET", 
+            { deliveryPincode, paymentMethod }, 
+            error.response?.data, 
+            error.response?.status, 
+            null,
+            error.message
+        );
+        return { serviceable: false, rates: [], weight: 0.5, dimensions: { length: 10, width: 10, height: 10 } };
+    }
+};
+
 const createShiprocketOrder = async (orderDetails) => {
     try {
         const token = await getShiprocketToken();
+        const Settings = require("../models/Settings");
+        const Product = require("../models/Product");
+
+        // Load shipping settings
+        let settings = {
+            pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
+            defaultWeight: 0.1,
+            defaultLength: 10,
+            defaultWidth: 10,
+            defaultHeight: 10
+        };
+        const settingsDoc = await Settings.findOne({ key: "shippingSettings" });
+        if (settingsDoc && settingsDoc.value) {
+            settings = { ...settings, ...settingsDoc.value };
+        }
+
+        // Calculate dynamic dimensions and weights
+        let totalWeight = 0;
+        let maxLength = 0;
+        let maxWidth = 0;
+        let totalHeight = 0;
+
+        const orderItemsMapped = [];
+
+        for (const item of orderDetails.orderItems) {
+            const product = await Product.findById(item.product);
+            const qty = item.qty || 1;
+            
+            const shippingConfig = product?.shippingConfig || {};
+            const itemWeight = (shippingConfig.weight || settings.defaultWeight) * qty;
+            totalWeight += itemWeight;
+
+            maxLength = Math.max(maxLength, shippingConfig.length || settings.defaultLength);
+            maxWidth = Math.max(maxWidth, shippingConfig.width || settings.defaultWidth);
+            totalHeight += (shippingConfig.height || settings.defaultHeight) * qty;
+
+            orderItemsMapped.push({
+                name: item.name,
+                sku: item.product.toString(),
+                units: qty,
+                selling_price: item.price,
+                discount: 0,
+                tax: 0,
+                hsn: shippingConfig.hsnCode || "711319"
+            });
+        }
+
+        totalWeight = Math.max(0.1, totalWeight);
+        maxLength = Math.max(10, maxLength);
+        maxWidth = Math.max(10, maxWidth);
+        totalHeight = Math.max(10, totalHeight);
 
         // Map our orderDetails to Shiprocket payload
         const payload = {
             order_id: orderDetails._id.toString(),
             order_date: new Date(orderDetails.createdAt).toISOString().split('T')[0],
-            pickup_location: process.env.SHIPROCKET_PICKUP_LOCATION || "Primary",
+            pickup_location: settings.pickupLocation,
             billing_customer_name: orderDetails.shippingAddress.name.split(' ')[0] || "Customer",
             billing_last_name: orderDetails.shippingAddress.name.split(' ').slice(1).join(' ') || "",
             billing_address: orderDetails.shippingAddress.street,
@@ -45,56 +220,94 @@ const createShiprocketOrder = async (orderDetails) => {
             billing_email: orderDetails.shippingAddress.email || "noemail@example.com",
             billing_phone: orderDetails.shippingAddress.phone,
             shipping_is_billing: true,
-            order_items: orderDetails.orderItems.map(item => ({
-                name: item.name,
-                sku: item.product.toString(),
-                units: item.qty,
-                selling_price: item.price,
-                discount: 0,
-                tax: 0,
-                hsn: 711319 // Example HSN code for jewelry
-            })),
+            order_items: orderItemsMapped,
             payment_method: orderDetails.paymentMethod === "Cash on Delivery" ? "COD" : "Prepaid",
             shipping_charges: orderDetails.shippingPrice,
             giftwrap_charges: 0,
             transaction_charges: 0,
             total_discount: 0,
             sub_total: orderDetails.itemsPrice,
-            length: 10,
-            breadth: 10,
-            height: 10,
-            weight: 0.5
+            length: maxLength,
+            breadth: maxWidth,
+            height: totalHeight,
+            weight: totalWeight
         };
 
-        const response = await axios.post(`${SHIPROCKET_API_BASE}/orders/create/adhoc`, payload, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            },
-            timeout: 5000
-        });
+        const fn = async () => {
+            return await axios.post(`${SHIPROCKET_API_BASE}/orders/create/adhoc`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+
+        await logShiprocketAction(
+            "/orders/create/adhoc", 
+            "POST", 
+            payload, 
+            response.data, 
+            response.status, 
+            orderDetails._id
+        );
 
         return response.data;
     } catch (error) {
         console.error("Error creating Shiprocket order:", error.response ? JSON.stringify(error.response.data) : error.message);
-        // Returning null instead of throwing to prevent failing the entire user checkout flow if shiprocket is down
+        await logShiprocketAction(
+            "/orders/create/adhoc", 
+            "POST", 
+            { orderId: orderDetails._id }, 
+            error.response?.data, 
+            error.response?.status, 
+            orderDetails._id,
+            error.message
+        );
         return null;
     }
 };
 
-const generateAWB = async (shipmentId) => {
+const generateAWB = async (shipmentId, courierId = null) => {
     try {
         const token = await getShiprocketToken();
-        const response = await axios.post(`${SHIPROCKET_API_BASE}/courier/assign/awb`, {
-            shipment_id: shipmentId
-        }, {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
+        const payload = { shipment_id: shipmentId };
+        if (courierId) {
+            payload.courier_id = courierId;
+        }
+
+        const fn = async () => {
+            return await axios.post(`${SHIPROCKET_API_BASE}/courier/assign/awb`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+        await logShiprocketAction(
+            "/courier/assign/awb",
+            "POST",
+            payload,
+            response.data,
+            response.status,
+            null
+        );
 
         return response.data;
     } catch (error) {
         console.error("Error generating AWB:", error.response ? error.response.data : error.message);
+        await logShiprocketAction(
+            "/courier/assign/awb",
+            "POST",
+            { shipmentId, courierId },
+            error.response?.data,
+            error.response?.status,
+            null,
+            error.message
+        );
         return null;
     }
 };
@@ -108,7 +321,7 @@ const schedulePickup = async (shipmentId) => {
             headers: {
                 Authorization: `Bearer ${token}`
             },
-            timeout: 5000
+            timeout: 8000
         });
         return response.data;
     } catch (error) {
@@ -117,22 +330,23 @@ const schedulePickup = async (shipmentId) => {
     }
 };
 
-const processShiprocketFulfillment = async (order) => {
+const processShiprocketFulfillment = async (order, courierId = null) => {
     try {
         console.log(`Processing Shiprocket fulfillment for order ${order._id}`);
         // 1. Create Order in Shiprocket
         const srOrder = await createShiprocketOrder(order);
         
-        console.log("SHIPROCKET API RAW RESPONSE:");
-        console.log(JSON.stringify(srOrder, null, 2));
+        console.log("SHIPROCKET API RAW RESPONSE:", JSON.stringify(srOrder));
 
         if (srOrder && srOrder.shipment_id) {
             // 2. Assign AWB (Auto-generate shipping label tracking)
-            const awbRes = await generateAWB(srOrder.shipment_id);
+            const awbRes = await generateAWB(srOrder.shipment_id, courierId);
 
             let trackingId = null;
+            let courierName = null;
             if (awbRes && awbRes.response && awbRes.response.data && awbRes.response.data.awb_code) {
                 trackingId = awbRes.response.data.awb_code;
+                courierName = awbRes.response.data.courier_name || "Shiprocket Partner";
 
                 // 3. Automatically schedule pickup
                 try {
@@ -147,7 +361,9 @@ const processShiprocketFulfillment = async (order) => {
             return {
                 shiprocketOrderId: srOrder.order_id,
                 shipmentId: srOrder.shipment_id,
-                trackingId: trackingId
+                trackingId: trackingId,
+                courierName: courierName,
+                trackingUrl: trackingId ? `https://shiprocket.co/tracking/${trackingId}` : null
             };
         }
 
@@ -175,10 +391,177 @@ const generateLabel = async (shipmentIds) => {
     }
 };
 
+const createReverseShipment = async (order, reason) => {
+    try {
+        const token = await getShiprocketToken();
+        const Settings = require("../models/Settings");
+        const Product = require("../models/Product");
+
+        // Load settings
+        let settings = {
+            pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
+            pickupPostcode: "110001",
+            defaultWeight: 0.1,
+            defaultLength: 10,
+            defaultWidth: 10,
+            defaultHeight: 10
+        };
+        const settingsDoc = await Settings.findOne({ key: "shippingSettings" });
+        if (settingsDoc && settingsDoc.value) {
+            settings = { ...settings, ...settingsDoc.value };
+        }
+
+        // Calculate dynamic dimensions and weights
+        let totalWeight = 0;
+        let maxLength = 0;
+        let maxWidth = 0;
+        let totalHeight = 0;
+
+        const orderItemsMapped = [];
+
+        for (const item of order.orderItems) {
+            const product = await Product.findById(item.product);
+            const qty = item.qty || 1;
+            
+            const shippingConfig = product?.shippingConfig || {};
+            const itemWeight = (shippingConfig.weight || settings.defaultWeight) * qty;
+            totalWeight += itemWeight;
+
+            maxLength = Math.max(maxLength, shippingConfig.length || settings.defaultLength);
+            maxWidth = Math.max(maxWidth, shippingConfig.width || settings.defaultWidth);
+            totalHeight += (shippingConfig.height || settings.defaultHeight) * qty;
+
+            orderItemsMapped.push({
+                name: item.name,
+                sku: item.product.toString(),
+                units: qty,
+                selling_price: item.price,
+                discount: 0,
+                tax: 0,
+                hsn: shippingConfig.hsnCode || "711319"
+            });
+        }
+
+        totalWeight = Math.max(0.1, totalWeight);
+        maxLength = Math.max(10, maxLength);
+        maxWidth = Math.max(10, maxWidth);
+        totalHeight = Math.max(10, totalHeight);
+
+        // Payload for reverse order
+        const payload = {
+            order_id: `${order._id.toString()}-R`,
+            order_date: new Date().toISOString().split('T')[0],
+            pickup_customer_name: order.shippingAddress.name.split(' ')[0] || "Customer",
+            pickup_last_name: order.shippingAddress.name.split(' ').slice(1).join(' ') || "",
+            pickup_address: order.shippingAddress.street,
+            pickup_city: order.shippingAddress.city,
+            pickup_state: order.shippingAddress.state,
+            pickup_pincode: order.shippingAddress.pincode,
+            pickup_country: order.shippingAddress.country || "India",
+            pickup_phone: order.shippingAddress.phone,
+            pickup_email: order.shippingAddress.email || "noemail@example.com",
+            
+            // Return destination is warehouse
+            shipping_customer_name: "An.n.Ash Warehouse",
+            shipping_address: "An.n.Ash Office, Main Market",
+            shipping_city: "Delhi",
+            shipping_state: "Delhi",
+            shipping_country: "India",
+            shipping_pincode: settings.pickupPostcode,
+            shipping_phone: "9999999999",
+
+            order_items: orderItemsMapped,
+            payment_method: "Prepaid",
+            sub_total: order.itemsPrice,
+            length: maxLength,
+            breadth: maxWidth,
+            height: totalHeight,
+            weight: totalWeight
+        };
+
+        const fn = async () => {
+            return await axios.post(`${SHIPROCKET_API_BASE}/orders/create/return`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+
+        await logShiprocketAction(
+            "/orders/create/return", 
+            "POST", 
+            payload, 
+            response.data, 
+            response.status, 
+            order._id
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error("Error creating reverse Shiprocket order:", error.response ? JSON.stringify(error.response.data) : error.message);
+        await logShiprocketAction(
+            "/orders/create/return", 
+            "POST", 
+            { orderId: order._id, reason }, 
+            error.response?.data, 
+            error.response?.status, 
+            order._id,
+            error.message
+        );
+        return null;
+    }
+};
+
+const getTrackingDetails = async (awbCode) => {
+    try {
+        const token = await getShiprocketToken();
+        const url = `${SHIPROCKET_API_BASE}/courier/track/awb/${awbCode}`;
+
+        const fn = async () => {
+            return await axios.get(url, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+        await logShiprocketAction(
+            `/courier/track/awb/${awbCode}`,
+            "GET",
+            null,
+            response.data,
+            response.status,
+            null
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error(`Error tracking AWB ${awbCode}:`, error.response ? JSON.stringify(error.response.data) : error.message);
+        await logShiprocketAction(
+            `/courier/track/awb/${awbCode}`,
+            "GET",
+            null,
+            error.response?.data,
+            error.response?.status,
+            null,
+            error.message
+        );
+        return null;
+    }
+};
+
 module.exports = {
     createShiprocketOrder,
     generateAWB,
     processShiprocketFulfillment,
     generateLabel,
-    schedulePickup
+    schedulePickup,
+    calculateShippingRates,
+    createReverseShipment,
+    getTrackingDetails
 };

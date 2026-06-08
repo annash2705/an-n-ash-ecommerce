@@ -51,6 +51,8 @@ export default function CheckoutPage() {
 
     const [paymentMethod, setPaymentMethod] = useState("Razorpay");
     const [loading, setLoading] = useState(false);
+const [shippingOptions, setShippingOptions] = useState<Array<{service:string;price:number;estimatedDays:number}>>([]);
+const [selectedShipping, setSelectedShipping] = useState<{service:string;price:number;estimatedDays:number} | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Protect route & load saved addresses
@@ -205,7 +207,31 @@ export default function CheckoutPage() {
         else if (!/^\d{6}$/.test(address.pincode.trim())) newErrors.pincode = "Enter a valid 6-digit pincode";
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
+};
+
+useEffect(() => {
+      const fetchRates = async () => {
+        if (/^\d{6}$/.test(address.pincode)) {
+          try {
+            const { data } = await api.post('/shipping/calculate-rates', {
+              pincode: address.pincode,
+              items: cartItems,
+              paymentMethod,
+            });
+            setShippingOptions(data.rates || []);
+            setSelectedShipping(null);
+          } catch (err) {
+            console.error('Failed to fetch shipping rates', err);
+            setShippingOptions([]);
+            setSelectedShipping(null);
+          }
+        } else {
+          setShippingOptions([]);
+          setSelectedShipping(null);
+        }
+      };
+      fetchRates();
+}, [address.pincode]);
 
     const placeOrderHandler = async () => {
         if (!validateForm()) return;
@@ -216,8 +242,8 @@ export default function CheckoutPage() {
                 shippingAddress: address, 
                 paymentMethod, 
                 itemsPrice: cartTotal, 
-                shippingPrice: cartTotal > 0 ? 100 : 0, 
-                totalPrice: cartTotal + (cartTotal > 0 ? 100 : 0) 
+                shippingPrice: selectedShipping?.price || 0, 
+                totalPrice: cartTotal + (selectedShipping?.price || 0), 
             };
             const { data } = await api.post("/orders", orderData);
             if (paymentMethod === "Razorpay") {
@@ -464,6 +490,28 @@ export default function CheckoutPage() {
                                     <input type="text" name="country" value="India" readOnly className="input-elegant bg-beige/30 cursor-not-allowed" />
                                 </div>
                             </div>
+                            {shippingOptions.length > 0 && (
+                                <div className="card-premium p-6 sm:p-8 mt-6">
+                                    <h2 className="text-2xl font-serif mb-4">Shipping Options</h2>
+                                    <div className="space-y-4">
+                                        {shippingOptions.map((opt, idx) => (
+                                            <label key={idx} className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${selectedShipping?.service===opt.service ? 'border-gold bg-gold/5' : 'border-beige hover:border-gold-light'}`}>
+                                                <input
+                                                    type="radio"
+                                                    name="shippingOption"
+                                                    value={opt.service}
+                                                    checked={selectedShipping?.service===opt.service}
+                                                    onChange={() => setSelectedShipping(opt)}
+                                                    className="text-gold focus:ring-gold"
+                                                />
+                                                <span className="ml-3 text-foreground font-medium">
+                                                    {opt.service} - ₹{opt.price} ({opt.estimatedDays} days)
+                                                </span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Payment Selection */}
@@ -496,8 +544,11 @@ export default function CheckoutPage() {
                             </ul>
                             <dl className="space-y-4 text-sm text-foreground/80">
                                 <div className="flex justify-between"><dt>Subtotal</dt><dd className="font-medium text-foreground">₹{cartTotal}</dd></div>
-                                <div className="flex justify-between border-t border-beige/60 pt-4"><dt>Shipping</dt><dd className="font-medium text-foreground">₹{cartTotal > 0 ? 100 : 0}</dd></div>
-                                <div className="flex justify-between border-t border-beige/60 pt-4 text-lg font-medium text-foreground"><dt>Total</dt><dd className="text-gold font-semibold text-xl">₹{cartTotal > 0 ? cartTotal + 100 : 0}</dd></div>
+                                <div className="flex justify-between border-t border-beige/60 pt-4">
+                                    <dt>Shipping</dt>
+                                    <dd className="font-medium text-foreground">₹{selectedShipping?.price || 0}</dd>
+                                </div>
+                                <div className="flex justify-between border-t border-beige/60 pt-4 text-lg font-medium text-foreground"><dt>Total</dt><dd className="text-gold font-semibold text-xl">₹{cartTotal > 0 ? cartTotal + (selectedShipping?.price || 0) : 0}</dd></div>
                             </dl>
                             <div className="mt-8">
                                 <Button fullWidth size="lg" onClick={placeOrderHandler} disabled={cartItems.length === 0 || loading}>{loading ? "Processing..." : "Place Order"}</Button>

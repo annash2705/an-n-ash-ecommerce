@@ -71,6 +71,17 @@ const productSchema = new mongoose.Schema(
             required: true,
             default: 0,
         },
+        shippingConfig: {
+            weight: { type: Number, default: 0.1 }, // in kg
+            length: { type: Number, default: 10 },  // in cm
+            width: { type: Number, default: 10 },   // in cm
+            height: { type: Number, default: 10 },  // in cm
+            fragile: { type: Boolean, default: false },
+            requiresSpecialPackaging: { type: Boolean, default: false },
+            shippingClass: { type: String, default: "Standard" },
+            hsnCode: { type: String, default: "711319" }, // HSN for jewelry
+            countryOfOrigin: { type: String, default: "India" }
+        },
     },
     {
         timestamps: true,

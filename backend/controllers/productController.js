@@ -107,7 +107,8 @@ const updateProduct = async (req, res) => {
         category,
         countInStock,
         materials,
-        isHandmade
+        isHandmade,
+        shippingConfig
     } = req.body;
 
     try {
@@ -122,6 +123,7 @@ const updateProduct = async (req, res) => {
             product.countInStock = countInStock !== undefined ? countInStock : product.countInStock;
             product.materials = materials !== undefined ? materials : product.materials;
             product.isHandmade = isHandmade !== undefined ? isHandmade : product.isHandmade;
+            product.shippingConfig = shippingConfig !== undefined ? shippingConfig : product.shippingConfig;
 
             const updatedProduct = await product.save();
             res.json(updatedProduct);

@@ -52,6 +52,7 @@ const uploadRoutes = require("./routes/uploadRoutes");
 const orderRoutes = require("./routes/orderRoutes");
 const customRequestRoutes = require("./routes/customRequestRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
+const shippingRoutes = require("./routes/shippingRoutes");
 const { getRazorpayClientId } = require("./controllers/orderController");
 
 // Mount Routes
@@ -61,6 +62,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/orders", orderRoutes);
 app.use("/api/custom-requests", customRequestRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/shipping", shippingRoutes);
 app.get("/api/config/razorpay", getRazorpayClientId);
 
 // 404 handler

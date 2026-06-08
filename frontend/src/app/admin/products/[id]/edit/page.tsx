@@ -23,6 +23,16 @@ export default function ProductEditPage() {
     const [isHandmade, setIsHandmade] = useState(true);
     const [images, setImages] = useState<any[]>([]);
 
+    const [weight, setWeight] = useState(0.1);
+    const [length, setLength] = useState(10);
+    const [width, setWidth] = useState(10);
+    const [height, setHeight] = useState(10);
+    const [fragile, setFragile] = useState(false);
+    const [requiresSpecialPackaging, setRequiresSpecialPackaging] = useState(false);
+    const [shippingClass, setShippingClass] = useState("Standard");
+    const [hsnCode, setHsnCode] = useState("711319");
+    const [countryOfOrigin, setCountryOfOrigin] = useState("India");
+
     const [uploading, setUploading] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -39,6 +49,17 @@ export default function ProductEditPage() {
                 setMaterials(data.materials);
                 setIsHandmade(data.isHandmade);
                 setImages(data.images || []);
+                if (data.shippingConfig) {
+                    setWeight(data.shippingConfig.weight || 0.1);
+                    setLength(data.shippingConfig.length || 10);
+                    setWidth(data.shippingConfig.width || 10);
+                    setHeight(data.shippingConfig.height || 10);
+                    setFragile(!!data.shippingConfig.fragile);
+                    setRequiresSpecialPackaging(!!data.shippingConfig.requiresSpecialPackaging);
+                    setShippingClass(data.shippingConfig.shippingClass || "Standard");
+                    setHsnCode(data.shippingConfig.hsnCode || "711319");
+                    setCountryOfOrigin(data.shippingConfig.countryOfOrigin || "India");
+                }
             } catch (err) {
                 setError("Error fetching product");
             } finally {
@@ -93,6 +114,17 @@ export default function ProductEditPage() {
                 materials,
                 isHandmade,
                 images,
+                shippingConfig: {
+                    weight,
+                    length,
+                    width,
+                    height,
+                    fragile,
+                    requiresSpecialPackaging,
+                    shippingClass,
+                    hsnCode,
+                    countryOfOrigin
+                }
             });
             router.push("/admin/products");
         } catch (err: any) {
@@ -188,6 +220,53 @@ export default function ProductEditPage() {
                             )}
                             <input type="file" accept="image/*" onChange={uploadFileHandler} className="w-full border border-beige bg-gray-50 rounded-sm p-3 focus:outline-none focus:border-gold" />
                             {uploading && <p className="text-sm mt-2 text-gold">Uploading image...</p>}
+                        </div>
+
+                        {/* Shipping Configuration Section */}
+                        <div className="md:col-span-2 pt-6 border-t border-beige">
+                            <h3 className="text-lg font-serif text-foreground mb-4">Shipping Configuration</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Weight (kg)</label>
+                                    <input required type="number" step="0.001" min="0.001" value={weight} onChange={(e) => setWeight(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Length (cm)</label>
+                                    <input required type="number" min="1" value={length} onChange={(e) => setLength(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Width (cm)</label>
+                                    <input required type="number" min="1" value={width} onChange={(e) => setWidth(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Height (cm)</label>
+                                    <input required type="number" min="1" value={height} onChange={(e) => setHeight(Number(e.target.value))} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Shipping Class</label>
+                                    <select value={shippingClass} onChange={(e) => setShippingClass(e.target.value)} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold">
+                                        <option value="Standard">Standard</option>
+                                        <option value="Express">Express</option>
+                                        <option value="Fragile">Fragile</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">HSN Code</label>
+                                    <input required type="text" value={hsnCode} onChange={(e) => setHsnCode(e.target.value)} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Country of Origin</label>
+                                    <input required type="text" value={countryOfOrigin} onChange={(e) => setCountryOfOrigin(e.target.value)} className="w-full border border-beige rounded-sm p-3 focus:outline-none focus:border-gold" />
+                                </div>
+                                <div className="flex items-center mt-6">
+                                    <input type="checkbox" id="fragile" checked={fragile} onChange={(e) => setFragile(e.target.checked)} className="h-4 w-4 text-gold border-beige rounded focus:ring-gold" />
+                                    <label htmlFor="fragile" className="ml-2 block text-sm text-foreground font-medium">Fragile Item</label>
+                                </div>
+                                <div className="flex items-center mt-6">
+                                    <input type="checkbox" id="specialPkg" checked={requiresSpecialPackaging} onChange={(e) => setRequiresSpecialPackaging(e.target.checked)} className="h-4 w-4 text-gold border-beige rounded focus:ring-gold" />
+                                    <label htmlFor="specialPkg" className="ml-2 block text-sm text-foreground font-medium">Special Packaging</label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
