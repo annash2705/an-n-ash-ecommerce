@@ -93,7 +93,7 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
 
         // 2. Load settings
         let settings = {
-            pickupPostcode: "110001",
+            pickupPostcode: "500070",
             pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
             defaultWeight: 0.1
         };
