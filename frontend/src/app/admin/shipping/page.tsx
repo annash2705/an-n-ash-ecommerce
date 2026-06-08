@@ -84,6 +84,7 @@ export default function AdminShippingPage() {
                 pincode,
                 items,
                 paymentMethod,
+                adminMode: true,
             });
             if (data.serviceable) {
                 setRates(prev => ({ ...prev, [orderId]: data.rates }));

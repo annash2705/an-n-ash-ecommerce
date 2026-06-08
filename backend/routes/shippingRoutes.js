@@ -12,7 +12,7 @@ const { sendShippingNotification } = require("../utils/notifications");
 // @route   POST /api/shipping/calculate-rates
 // @access  Private
 router.post("/calculate-rates", protect, async (req, res) => {
-    const { pincode, items, paymentMethod } = req.body;
+    const { pincode, items, paymentMethod, adminMode } = req.body;
 
     if (!pincode || !items || items.length === 0) {
         return res.status(400).json({ message: "Pincode and cart items are required." });
@@ -43,6 +43,41 @@ router.post("/calculate-rates", protect, async (req, res) => {
 
         // Subtotal of items
         const subtotal = items.reduce((acc, item) => acc + (item.price * item.qty), 0);
+
+        // If adminMode and user is admin, return raw courier list with ratings
+        if (adminMode && req.user.isAdmin) {
+            const rawRates = result.rates.map(courier => {
+                const etdHours = Number(courier.etd_hours || 72);
+                const deliveryDays = Math.ceil(etdHours / 24) || 3;
+
+                const baseCharge = Number(courier.rate);
+                let charge = baseCharge;
+
+                if (shippingSettings.rule === "free") {
+                    charge = 0;
+                } else if (shippingSettings.rule === "threshold" && subtotal >= shippingSettings.freeShippingThreshold) {
+                    charge = 0;
+                } else if (shippingSettings.rule === "partial") {
+                    charge = Math.round(baseCharge / 2);
+                }
+
+                return {
+                    courierId: courier.courier_company_id,
+                    name: courier.courier_name,
+                    rating: Number(courier.ratings) || 4.0,
+                    deliveryDays,
+                    cost: charge,
+                    codAvailable: courier.cod === 1
+                };
+            });
+
+            rawRates.sort((a, b) => a.cost - b.cost);
+
+            return res.json({
+                serviceable: true,
+                rates: rawRates
+            });
+        }
 
         const standardCouriers = [];
         const expressCouriers = [];
