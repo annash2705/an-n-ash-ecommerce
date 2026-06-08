@@ -237,7 +237,7 @@ useEffect(() => {
         }
       };
       fetchRates();
-}, [address.pincode, paymentMethod]);
+}, [address.pincode, paymentMethod, JSON.stringify(cartItems)]);
 
     const placeOrderHandler = async () => {
         if (!validateForm()) return;
