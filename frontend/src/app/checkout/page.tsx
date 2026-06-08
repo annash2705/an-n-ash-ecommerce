@@ -51,9 +51,15 @@ export default function CheckoutPage() {
 
     const [paymentMethod, setPaymentMethod] = useState("Razorpay");
     const [loading, setLoading] = useState(false);
-const [shippingOptions, setShippingOptions] = useState<Array<{service:string;price:number;estimatedDays:number}>>([]);
-const [selectedShipping, setSelectedShipping] = useState<{service:string;price:number;estimatedDays:number} | null>(null);
+    const [shippingOptions, setShippingOptions] = useState<Array<{service:string;price:number;estimatedDays:number;courierId?:string}>>([]);
+    const [selectedShipping, setSelectedShipping] = useState<{service:string;price:number;estimatedDays:number;courierId?:string} | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [checkoutId, setCheckoutId] = useState("");
+
+    // Generate unique idempotency key when checkout mounts
+    useEffect(() => {
+        setCheckoutId("chk-" + Math.random().toString(36).substring(2, 15) + Date.now().toString(36));
+    }, []);
 
     // Protect route & load saved addresses
     useEffect(() => {
@@ -243,7 +249,9 @@ useEffect(() => {
                 paymentMethod, 
                 itemsPrice: cartTotal, 
                 shippingPrice: selectedShipping?.price || 0, 
-                totalPrice: cartTotal + (selectedShipping?.price || 0), 
+                totalPrice: cartTotal + (selectedShipping?.price || 0),
+                idempotencyKey: checkoutId,
+                courierId: selectedShipping?.courierId || undefined,
             };
             const { data } = await api.post("/orders", orderData);
             if (paymentMethod === "Razorpay") {

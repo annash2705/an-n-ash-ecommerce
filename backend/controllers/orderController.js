@@ -88,6 +88,7 @@ const addOrderItems = async (req, res) => {
         shippingPrice,
         totalPrice,
         idempotencyKey,
+        courierId,
     } = req.body;
 
     if (!orderItems || orderItems.length === 0) {
@@ -144,6 +145,7 @@ const addOrderItems = async (req, res) => {
             shippingPrice,
             totalPrice,
             idempotencyKey: idempotencyKey || undefined,
+            courierId: courierId || undefined,
             orderTimeline: [{
                 status: "order placed",
                 timestamp: new Date(),
@@ -173,7 +175,8 @@ const addOrderItems = async (req, res) => {
 
             if (isAutoShiprocket) {
                 try {
-                    const fulfillment = await processShiprocketFulfillment(createdOrder);
+                    // Pass the locked courier ID selected at checkout
+                    const fulfillment = await processShiprocketFulfillment(createdOrder, createdOrder.courierId);
                     if (fulfillment) {
                         if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
                         if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
@@ -325,8 +328,8 @@ const verifyRazorpayPayment = async (req, res) => {
 
             if (isAutoShiprocket) {
                 try {
-                    // Trigger Shiprocket fulfillment for Prepaid orders
-                    const fulfillment = await processShiprocketFulfillment(order);
+                    // Trigger Shiprocket fulfillment for Prepaid orders using checkout locked courier
+                    const fulfillment = await processShiprocketFulfillment(order, order.courierId);
                     if (fulfillment) {
                         if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
                         if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;

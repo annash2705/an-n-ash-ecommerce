@@ -83,52 +83,76 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
         const token = await getShiprocketToken();
         const Settings = require("../models/Settings");
         const Product = require("../models/Product");
+        const ShippingCache = require("../models/ShippingCache");
+        const crypto = require("crypto");
 
-        // Load shipping settings
+        // 1. Calculate items signature to check caching
+        const sortedItems = [...items].sort((a, b) => a.product.toString().localeCompare(b.product.toString()));
+        const itemsString = sortedItems.map(item => `${item.product}:${item.qty}`).join(",");
+        const itemsHash = crypto.createHash("md5").update(itemsString).digest("hex");
+
+        // 2. Load settings
         let settings = {
             pickupPostcode: "110001",
             pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
-            defaultWeight: 0.1,
-            defaultLength: 10,
-            defaultWidth: 10,
-            defaultHeight: 10
+            defaultWeight: 0.1
         };
         const settingsDoc = await Settings.findOne({ key: "shippingSettings" });
         if (settingsDoc && settingsDoc.value) {
             settings = { ...settings, ...settingsDoc.value };
         }
 
-        // Calculate package weight and dimensions
+        // 3. Weight calculation: Sum of (product weight * quantity)
         let totalWeight = 0;
-        let maxLength = 0;
-        let maxWidth = 0;
-        let totalHeight = 0;
-
         for (const item of items) {
             const product = await Product.findById(item.product);
             const qty = item.qty || 1;
-            
             const shippingConfig = product?.shippingConfig || {};
             const itemWeight = (shippingConfig.weight || settings.defaultWeight) * qty;
             totalWeight += itemWeight;
-
-            // Simple packaging dimensions heuristics
-            maxLength = Math.max(maxLength, shippingConfig.length || settings.defaultLength);
-            maxWidth = Math.max(maxWidth, shippingConfig.width || settings.defaultWidth);
-            totalHeight += (shippingConfig.height || settings.defaultHeight) * qty;
         }
 
-        // Constraints
-        totalWeight = Math.max(0.1, totalWeight); // min 100 grams
-        maxLength = Math.max(10, maxLength);
-        maxWidth = Math.max(10, maxWidth);
-        totalHeight = Math.max(10, totalHeight);
+        totalWeight = Math.max(0.1, Math.round(totalWeight * 100) / 100); // min 100 grams, rounded to 2 decimals
+
+        // Check if rates cache exists in DB
+        const cached = await ShippingCache.findOne({
+            pincode: deliveryPincode,
+            weight: totalWeight,
+            paymentMethod,
+            itemsHash
+        });
+
+        // Predefined Box Sizes based on Total Weight (no summing of dimensions)
+        const BOX_SIZES = [
+            { name: "Small Box", length: 15, width: 15, height: 5, maxWeight: 0.5 },
+            { name: "Medium Box", length: 25, width: 20, height: 10, maxWeight: 2.0 },
+            { name: "Large Box", length: 35, width: 30, height: 20, maxWeight: 10.0 },
+            { name: "Extra Large Box", length: 45, width: 40, height: 30, maxWeight: 30.0 }
+        ];
+
+        const selectBox = (weight) => {
+            for (const box of BOX_SIZES) {
+                if (weight <= box.maxWeight) return box;
+            }
+            return BOX_SIZES[BOX_SIZES.length - 1]; // fallback XL
+        };
+
+        const box = selectBox(totalWeight);
+
+        if (cached) {
+            console.log(`[Shipping Cache Hit] Pincode: ${deliveryPincode}, Weight: ${totalWeight}kg`);
+            return {
+                serviceable: true,
+                rates: cached.rates,
+                weight: totalWeight,
+                dimensions: cached.box
+            };
+        }
 
         const codVal = paymentMethod === "Cash on Delivery" ? 1 : 0;
-
-        const url = `${SHIPROCKET_API_BASE}/courier/serviceability/?pickup_postcode=${settings.pickupPostcode}&delivery_postcode=${deliveryPincode}&weight=${totalWeight}&cod=${codVal}&length=${maxLength}&width=${maxWidth}&height=${totalHeight}`;
+        const url = `${SHIPROCKET_API_BASE}/courier/serviceability/?pickup_postcode=${settings.pickupPostcode}&delivery_postcode=${deliveryPincode}&weight=${totalWeight}&cod=${codVal}&length=${box.length}&width=${box.width}&height=${box.height}`;
         
-        console.log(`Checking Shiprocket rate availability: ${url}`);
+        console.log(`[Shiprocket Serviceability] Fetching rates: ${url}`);
         const response = await axios.get(url, {
             headers: {
                 Authorization: `Bearer ${token}`
@@ -139,22 +163,34 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
         await logShiprocketAction(
             "/courier/serviceability/", 
             "GET", 
-            { deliveryPincode, weight: totalWeight, cod: codVal }, 
+            { deliveryPincode, weight: totalWeight, cod: codVal, box }, 
             response.data, 
             response.status, 
             null
         );
 
         if (response.data && response.data.status === 200 && response.data.data) {
+            const rates = response.data.data.available_courier_companies;
+            
+            // Cache the retrieved rates in MongoDB
+            await ShippingCache.create({
+                pincode: deliveryPincode,
+                weight: totalWeight,
+                paymentMethod,
+                itemsHash,
+                rates,
+                box
+            });
+
             return {
                 serviceable: true,
-                rates: response.data.data.available_courier_companies,
+                rates,
                 weight: totalWeight,
-                dimensions: { length: maxLength, width: maxWidth, height: totalHeight }
+                dimensions: box
             };
         }
 
-        return { serviceable: false, rates: [], weight: totalWeight, dimensions: { length: maxLength, width: maxWidth, height: totalHeight } };
+        return { serviceable: false, rates: [], weight: totalWeight, dimensions: box };
     } catch (error) {
         console.error("Error calculating shipping rates:", error.response ? JSON.stringify(error.response.data) : error.message);
         await logShiprocketAction(
@@ -166,7 +202,9 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
             null,
             error.message
         );
-        return { serviceable: false, rates: [], weight: 0.5, dimensions: { length: 10, width: 10, height: 10 } };
+        
+        // Fallback default box size
+        return { serviceable: false, rates: [], weight: 0.5, dimensions: { length: 15, width: 15, height: 5 } };
     }
 };
 
@@ -179,35 +217,23 @@ const createShiprocketOrder = async (orderDetails) => {
         // Load shipping settings
         let settings = {
             pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
-            defaultWeight: 0.1,
-            defaultLength: 10,
-            defaultWidth: 10,
-            defaultHeight: 10
+            defaultWeight: 0.1
         };
         const settingsDoc = await Settings.findOne({ key: "shippingSettings" });
         if (settingsDoc && settingsDoc.value) {
             settings = { ...settings, ...settingsDoc.value };
         }
 
-        // Calculate dynamic dimensions and weights
+        // Calculate total weight and map items
         let totalWeight = 0;
-        let maxLength = 0;
-        let maxWidth = 0;
-        let totalHeight = 0;
-
         const orderItemsMapped = [];
 
         for (const item of orderDetails.orderItems) {
             const product = await Product.findById(item.product);
             const qty = item.qty || 1;
-            
             const shippingConfig = product?.shippingConfig || {};
             const itemWeight = (shippingConfig.weight || settings.defaultWeight) * qty;
             totalWeight += itemWeight;
-
-            maxLength = Math.max(maxLength, shippingConfig.length || settings.defaultLength);
-            maxWidth = Math.max(maxWidth, shippingConfig.width || settings.defaultWidth);
-            totalHeight += (shippingConfig.height || settings.defaultHeight) * qty;
 
             orderItemsMapped.push({
                 name: item.name,
@@ -220,10 +246,24 @@ const createShiprocketOrder = async (orderDetails) => {
             });
         }
 
-        totalWeight = Math.max(0.1, totalWeight);
-        maxLength = Math.max(10, maxLength);
-        maxWidth = Math.max(10, maxWidth);
-        totalHeight = Math.max(10, totalHeight);
+        totalWeight = Math.max(0.1, Math.round(totalWeight * 100) / 100);
+
+        // Predefined Box Sizing
+        const BOX_SIZES = [
+            { name: "Small Box", length: 15, width: 15, height: 5, maxWeight: 0.5 },
+            { name: "Medium Box", length: 25, width: 20, height: 10, maxWeight: 2.0 },
+            { name: "Large Box", length: 35, width: 30, height: 20, maxWeight: 10.0 },
+            { name: "Extra Large Box", length: 45, width: 40, height: 30, maxWeight: 30.0 }
+        ];
+
+        const selectBox = (weight) => {
+            for (const box of BOX_SIZES) {
+                if (weight <= box.maxWeight) return box;
+            }
+            return BOX_SIZES[BOX_SIZES.length - 1]; // fallback XL
+        };
+
+        const box = selectBox(totalWeight);
 
         // Map our orderDetails to Shiprocket payload
         const envPrefix = process.env.NODE_ENV === "production" ? "" : "DEV-";
@@ -248,9 +288,9 @@ const createShiprocketOrder = async (orderDetails) => {
             transaction_charges: 0,
             total_discount: 0,
             sub_total: orderDetails.itemsPrice,
-            length: maxLength,
-            breadth: maxWidth,
-            height: totalHeight,
+            length: box.length,
+            breadth: box.width,
+            height: box.height,
             weight: totalWeight
         };
 

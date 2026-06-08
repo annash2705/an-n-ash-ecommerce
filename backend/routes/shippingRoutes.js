@@ -44,8 +44,14 @@ router.post("/calculate-rates", protect, async (req, res) => {
         // Subtotal of items
         const subtotal = items.reduce((acc, item) => acc + (item.price * item.qty), 0);
 
-        // Map courier rates and apply settings rules
-        const formattedRates = result.rates.map(courier => {
+        const standardCouriers = [];
+        const expressCouriers = [];
+
+        result.rates.forEach(courier => {
+            const etdHours = Number(courier.etd_hours || 72);
+            const deliveryDays = Math.ceil(etdHours / 24) || 3;
+            const isExpressSpeed = deliveryDays <= 3; // Delivered within 3 days is Express
+
             const baseCharge = Number(courier.rate);
             let charge = baseCharge;
 
@@ -54,40 +60,73 @@ router.post("/calculate-rates", protect, async (req, res) => {
             } else if (shippingSettings.rule === "threshold" && subtotal >= shippingSettings.freeShippingThreshold) {
                 charge = 0;
             } else if (shippingSettings.rule === "partial") {
-                // Charge half of shipping cost
                 charge = Math.round(baseCharge / 2);
             }
 
-            // Determine speed type based on courier SLA
-            const deliveryDays = Number(courier.etd_hours) / 24;
-            let type = "Standard Delivery";
-            if (deliveryDays <= 2) {
-                type = "Express Delivery";
-                if (shippingSettings.expressDeliveryEnabled) {
-                    charge += shippingSettings.expressDeliveryCharges;
-                }
-            } else if (deliveryDays > 5) {
-                type = "Economy Delivery";
-            }
-
-            return {
+            const mappedCourier = {
                 courierId: courier.courier_company_id,
                 name: courier.courier_name,
-                rating: Number(courier.ratings) || 4.0,
-                deliveryDays: Math.ceil(deliveryDays) || 3,
+                deliveryDays,
                 cost: charge,
-                originalCost: baseCharge,
-                type,
                 codAvailable: courier.cod === 1
             };
+
+            if (isExpressSpeed) {
+                if (shippingSettings.expressDeliveryEnabled) {
+                    mappedCourier.cost += shippingSettings.expressDeliveryCharges;
+                }
+                expressCouriers.push(mappedCourier);
+            } else {
+                standardCouriers.push(mappedCourier);
+            }
         });
 
-        // Sort by cost ascending
-        formattedRates.sort((a, b) => a.cost - b.cost);
+        const deliveryOptions = [];
+
+        // Select the cheapest partner for Standard Delivery
+        if (standardCouriers.length > 0) {
+            standardCouriers.sort((a, b) => a.cost - b.cost);
+            const cheapestStandard = standardCouriers[0];
+            deliveryOptions.push({
+                service: "Standard Delivery",
+                courierId: cheapestStandard.courierId,
+                price: cheapestStandard.cost,
+                estimatedDays: cheapestStandard.deliveryDays,
+                codAvailable: cheapestStandard.codAvailable,
+                description: "Reliable surface shipping (3-6 business days)"
+            });
+        }
+
+        // Select the cheapest partner for Express Delivery
+        if (expressCouriers.length > 0) {
+            expressCouriers.sort((a, b) => a.cost - b.cost);
+            const cheapestExpress = expressCouriers[0];
+            deliveryOptions.push({
+                service: "Express Delivery",
+                courierId: cheapestExpress.courierId,
+                price: cheapestExpress.cost,
+                estimatedDays: cheapestExpress.deliveryDays,
+                codAvailable: cheapestExpress.codAvailable,
+                description: "Priority air shipping (1-3 business days)"
+            });
+        }
+
+        // Fallback: If no express but standard exists, or vice versa, ensure we have at least one option
+        if (deliveryOptions.length === 0 && result.rates.length > 0) {
+            const cheapestOverall = [...result.rates].sort((a, b) => Number(a.rate) - Number(b.rate))[0];
+            deliveryOptions.push({
+                service: "Standard Delivery",
+                courierId: cheapestOverall.courier_company_id,
+                price: Number(cheapestOverall.rate),
+                estimatedDays: Math.ceil(Number(cheapestOverall.etd_hours || 72) / 24) || 3,
+                codAvailable: cheapestOverall.cod === 1,
+                description: "Standard ground shipping"
+            });
+        }
 
         res.json({
             serviceable: true,
-            rates: formattedRates
+            rates: deliveryOptions
         });
 
     } catch (error) {
