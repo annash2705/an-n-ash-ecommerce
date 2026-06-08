@@ -118,9 +118,10 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
 
         totalWeight = Math.max(0.1, Math.round(totalWeight * 100) / 100); // min 100 grams, rounded to 2 decimals
 
-        // Check if rates cache exists in DB
+        // Check if rates cache exists in DB (include pickup postcode in key)
         const cached = await ShippingCache.findOne({
             pincode: deliveryPincode,
+            pickupPostcode: settings.pickupPostcode,
             weight: totalWeight,
             paymentMethod,
             itemsHash
@@ -144,7 +145,7 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
         const box = selectBox(totalWeight);
 
         if (cached) {
-            console.log(`[Shipping Cache Hit] Pincode: ${deliveryPincode}, Weight: ${totalWeight}kg`);
+            console.log(`[Shipping Cache Hit] Pickup: ${settings.pickupPostcode} → Delivery: ${deliveryPincode}, Weight: ${totalWeight}kg`);
             return {
                 serviceable: true,
                 rates: cached.rates,
@@ -179,6 +180,7 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
             // Cache the retrieved rates in MongoDB
             await ShippingCache.create({
                 pincode: deliveryPincode,
+                pickupPostcode: settings.pickupPostcode,
                 weight: totalWeight,
                 paymentMethod,
                 itemsHash,

@@ -440,4 +440,19 @@ router.post("/webhook", async (req, res) => {
     }
 });
 
+// @desc    Clear shipping rate cache
+// @route   DELETE /api/shipping/clear-cache
+// @access  Private/Admin
+router.delete("/clear-cache", protect, admin, async (req, res) => {
+    try {
+        const ShippingCache = require("../models/ShippingCache");
+        const result = await ShippingCache.deleteMany({});
+        console.log(`[Shipping Cache] Cleared ${result.deletedCount} cached entries`);
+        res.json({ message: `Cleared ${result.deletedCount} cached shipping rates` });
+    } catch (error) {
+        console.error("Clear cache error:", error.message);
+        res.status(500).json({ message: "Failed to clear cache" });
+    }
+});
+
 module.exports = router;
