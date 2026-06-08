@@ -177,6 +177,13 @@ router.get("/analytics", protect, admin, async (req, res) => {
 // @access  Public
 router.post("/webhook", async (req, res) => {
     const payload = req.body;
+    const webhookToken = process.env.SHIPROCKET_WEBHOOK_TOKEN;
+
+    // Secure Webhook endpoint
+    if (webhookToken && req.headers["x-webhook-token"] !== webhookToken) {
+        console.warn("[Webhook Security] Unauthorized webhook access blocked.");
+        return res.status(401).json({ message: "Invalid webhook token credentials." });
+    }
 
     try {
         // Log Webhook Inbound Payload for auditing
@@ -194,29 +201,92 @@ router.post("/webhook", async (req, res) => {
         const currentStatus = (payload.current_status || payload.status || "").toLowerCase().trim();
 
         if (!awbCode) {
-            return res.status(400).json({ message: "AWB code is missing in webhook payload" });
+            return res.status(200).json({ message: "AWB code is missing in webhook payload" });
         }
 
-        // Find order by trackingId (AWB) or reverseAwbCode
-        let order = await Order.findOne({ trackingId: awbCode });
-        let isReverse = false;
-
-        if (!order) {
-            order = await Order.findOne({ "returnDetails.reverseAwbCode": awbCode });
-            if (order) isReverse = true;
-        }
+        // Find order by trackingId (AWB) or reverseAwbCode, or inside shipments array
+        let order = await Order.findOne({
+            $or: [
+                { trackingId: awbCode },
+                { "returnDetails.reverseAwbCode": awbCode },
+                { "shipments.awbCode": awbCode }
+            ]
+        });
 
         if (!order) {
             console.warn(`Webhook received for untracked AWB: ${awbCode}`);
             return res.status(200).json({ message: "AWB not found in system, but payload logged." });
         }
 
-        // Map Shiprocket status string to local status
+        let isReverse = order.returnDetails?.reverseAwbCode === awbCode;
         let localStatus = "";
         let eventType = "";
         let description = "";
 
-        if (!isReverse) {
+        // Find the matched shipment item in order's shipments array
+        let shipmentIndex = order.shipments.findIndex(s => s.awbCode === awbCode);
+        if (shipmentIndex === -1 && order.shipmentId === awbCode) {
+            // Backfill if empty
+            order.shipments.push({
+                shipmentId: order.shipmentId,
+                awbCode: order.trackingId,
+                courierName: order.courierName || "Shiprocket Partner",
+                status: currentStatus
+            });
+            shipmentIndex = order.shipments.length - 1;
+        }
+
+        // 1. Process NDR / Undelivered status
+        if (["undelivered", "ndr", "delivery failed", "failed delivery"].includes(currentStatus)) {
+            localStatus = "shipped";
+            eventType = "delivery_failed";
+            const reason = payload.reason || payload.activity || "Customer unavailable or address unserviceable";
+            description = `Delivery attempt failed. Reason: ${reason}`;
+
+            if (shipmentIndex !== -1) {
+                order.shipments[shipmentIndex].status = "NDR";
+                const attemptNum = (order.shipments[shipmentIndex].ndrDetails?.length || 0) + 1;
+                order.shipments[shipmentIndex].ndrDetails.push({
+                    attemptNumber: attemptNum,
+                    reason: reason,
+                    status: "Undelivered",
+                    timestamp: new Date()
+                });
+            }
+        }
+        // 2. Process RTO (Return to Origin) status
+        else if (currentStatus.includes("rto") || ["rto initiated", "rto in transit", "rto delivered"].includes(currentStatus)) {
+            localStatus = "returned";
+            eventType = "rto_initiated";
+            description = `Package returned to origin. Status: ${currentStatus}`;
+
+            if (shipmentIndex !== -1) {
+                order.shipments[shipmentIndex].status = "RTO";
+                order.shipments[shipmentIndex].rtoDetails = {
+                    isRto: true,
+                    rtoAwb: awbCode,
+                    reason: payload.reason || "Delivery failed repeatedly",
+                    status: currentStatus.includes("delivered") ? "Delivered to Warehouse" : "In Transit",
+                    returnedAt: currentStatus.includes("delivered") ? new Date() : undefined
+                };
+            }
+        }
+        // 3. Process COD Remittance / Payout reconciliation if payout is present in payload
+        else if (payload.remittance_id || payload.utr || payload.payout_amount) {
+            description = `COD payout reconciled. UTR: ${payload.utr || "N/A"}`;
+            if (shipmentIndex !== -1) {
+                order.shipments[shipmentIndex].payoutReconciliation = {
+                    isReconciled: true,
+                    amountCollected: Number(payload.cod_amount || payload.payout_amount || 0),
+                    codCharges: Number(payload.cod_charges || 0),
+                    remittedAmount: Number(payload.payout_amount || 0),
+                    remittanceDate: payload.remittance_date ? new Date(payload.remittance_date) : new Date(),
+                    utr: payload.utr
+                };
+            }
+        }
+        // 4. Process Standard Forward/Reverse movements
+        else if (!isReverse) {
             // Forward Shipment
             if (["picked up", "pickup completed", "shipped"].includes(currentStatus)) {
                 localStatus = "shipped";
@@ -236,24 +306,25 @@ router.post("/webhook", async (req, res) => {
                 description = "Package has been successfully delivered.";
                 order.isDelivered = true;
                 order.deliveredAt = Date.now();
+                order.fulfillmentStatus = "fulfilled";
             } else if (["cancelled", "canceled"].includes(currentStatus)) {
                 localStatus = "cancelled";
                 eventType = "cancelled";
-                description = "Shipment was cancelled.";
+                description = "Shipment was cancelled in Shiprocket.";
+                order.fulfillmentStatus = "cancelled";
             }
         } else {
             // Reverse Shipment
             if (["picked up", "pickup completed", "shipped"].includes(currentStatus)) {
                 order.returnDetails.status = "Pickup Scheduled";
                 eventType = "return_approved";
-                description = "Reverse pickup has been completed.";
+                description = "Reverse pickup has been completed by courier.";
             } else if (["delivered", "completed", "returned"].includes(currentStatus)) {
                 order.returnDetails.status = "Completed";
                 localStatus = "returned";
                 eventType = "returned";
                 description = "Returned package has been received and inspected at warehouse.";
                 
-                // Set refund status as completed
                 order.returnDetails.refundStatus = "Refunded";
                 order.returnDetails.refundAmount = order.totalPrice;
                 order.returnDetails.resolvedAt = Date.now();
@@ -264,8 +335,13 @@ router.post("/webhook", async (req, res) => {
             order.orderStatus = localStatus;
         }
 
-        // Push to orderTimeline if description was mapped
-        if (description) {
+        // Prevent duplicate orderTimeline entries for the same description
+        const isDuplicateTimeline = order.orderTimeline.some(
+            t => t.description === description && 
+                 (new Date().getTime() - new Date(t.timestamp).getTime()) < 300000 // 5 min threshold
+        );
+
+        if (description && !isDuplicateTimeline) {
             order.orderTimeline.push({
                 status: localStatus || order.orderStatus,
                 timestamp: new Date(),
@@ -275,9 +351,11 @@ router.post("/webhook", async (req, res) => {
 
         await order.save();
 
-        // Trigger notifications
+        // Trigger notifications in the background
         if (eventType) {
-            await sendShippingNotification(order, eventType);
+            sendShippingNotification(order, eventType).catch(err => {
+                console.error("Webhook notification error:", err.message);
+            });
         }
 
         res.status(200).json({ message: "Webhook processed successfully" });

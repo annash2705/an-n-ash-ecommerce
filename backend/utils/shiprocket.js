@@ -7,18 +7,38 @@ let tokenExpiry = null;
 
 const getShiprocketToken = async () => {
     try {
+        const Settings = require("../models/Settings");
+
+        // Try memory cache first
         if (shiprocketToken && tokenExpiry && Date.now() < tokenExpiry) {
             return shiprocketToken;
         }
 
+        // Try database cache next
+        const cached = await Settings.findOne({ key: "shiprocketToken" });
+        if (cached && cached.value && cached.value.token && cached.value.expiry && Date.now() < cached.value.expiry) {
+            shiprocketToken = cached.value.token;
+            tokenExpiry = cached.value.expiry;
+            return shiprocketToken;
+        }
+
+        console.log("Fetching fresh Shiprocket Auth Token from API...");
         const response = await axios.post(`${SHIPROCKET_API_BASE}/auth/login`, {
             email: process.env.SHIPROCKET_EMAIL,
             password: process.env.SHIPROCKET_PASSWORD,
-        }, { timeout: 8000 });
+        }, { timeout: 10000 });
 
-        shiprocketToken = response.data.token;
-        // Token roughly expires in 10 days; set to 9 days to be safe
-        tokenExpiry = Date.now() + (9 * 24 * 60 * 60 * 1000);
+        const token = response.data.token;
+        const expiry = Date.now() + (9 * 24 * 60 * 60 * 1000); // 9 days
+
+        await Settings.findOneAndUpdate(
+            { key: "shiprocketToken" },
+            { value: { token, expiry } },
+            { upsert: true, new: true }
+        );
+
+        shiprocketToken = token;
+        tokenExpiry = expiry;
         return shiprocketToken;
     } catch (error) {
         console.error("Error authenticating with Shiprocket (Timeout or Auth Failure)", error.message);
@@ -206,8 +226,9 @@ const createShiprocketOrder = async (orderDetails) => {
         totalHeight = Math.max(10, totalHeight);
 
         // Map our orderDetails to Shiprocket payload
+        const envPrefix = process.env.NODE_ENV === "production" ? "" : "DEV-";
         const payload = {
-            order_id: orderDetails._id.toString(),
+            order_id: `${envPrefix}${orderDetails._id.toString()}`,
             order_date: new Date(orderDetails.createdAt).toISOString().split('T')[0],
             pickup_location: settings.pickupLocation,
             billing_customer_name: orderDetails.shippingAddress.name.split(' ')[0] || "Customer",
@@ -555,6 +576,76 @@ const getTrackingDetails = async (awbCode) => {
     }
 };
 
+const cancelShiprocketOrder = async (shiprocketOrderId) => {
+    try {
+        const token = await getShiprocketToken();
+        const payload = { ids: [shiprocketOrderId] };
+
+        const fn = async () => {
+            return await axios.post(`${SHIPROCKET_API_BASE}/orders/cancel`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+        await logShiprocketAction(
+            "/orders/cancel",
+            "POST",
+            payload,
+            response.data,
+            response.status,
+            null
+        );
+
+        return response.data;
+    } catch (error) {
+        console.error("Error cancelling Shiprocket order:", error.response ? JSON.stringify(error.response.data) : error.message);
+        await logShiprocketAction(
+            "/orders/cancel",
+            "POST",
+            { shiprocketOrderId },
+            error.response?.data,
+            error.response?.status,
+            null,
+            error.message
+        );
+        return null;
+    }
+};
+
+const generateManifest = async (shipmentIds) => {
+    try {
+        const token = await getShiprocketToken();
+        const payload = { shipment_ids: shipmentIds };
+
+        const fn = async () => {
+            return await axios.post(`${SHIPROCKET_API_BASE}/manifests/generate`, payload, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                },
+                timeout: 8000
+            });
+        };
+
+        const response = await executeWithRetry(fn);
+        await logShiprocketAction(
+            "/manifests/generate",
+            "POST",
+            payload,
+            response.data,
+            response.status,
+            null
+        );
+        return response.data;
+    } catch (error) {
+        console.error("Error generating Manifest:", error.message);
+        return null;
+    }
+};
+
 module.exports = {
     createShiprocketOrder,
     generateAWB,
@@ -563,5 +654,7 @@ module.exports = {
     schedulePickup,
     calculateShippingRates,
     createReverseShipment,
-    getTrackingDetails
+    getTrackingDetails,
+    cancelShiprocketOrder,
+    generateManifest
 };

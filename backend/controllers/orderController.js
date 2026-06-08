@@ -87,6 +87,7 @@ const addOrderItems = async (req, res) => {
         itemsPrice,
         shippingPrice,
         totalPrice,
+        idempotencyKey,
     } = req.body;
 
     if (!orderItems || orderItems.length === 0) {
@@ -94,19 +95,46 @@ const addOrderItems = async (req, res) => {
     }
 
     try {
-        // Validate stock availability before creating order
-        for (const item of orderItems) {
-            const product = await Product.findById(item.product);
-            if (!product) {
-                return res.status(404).json({ message: `Product not found: ${item.name}` });
-            }
-            if (product.countInStock < item.qty) {
-                return res.status(400).json({
-                    message: `Insufficient stock for ${product.name}. Only ${product.countInStock} available.`
-                });
+        // Step 1: Check Idempotency Key
+        if (idempotencyKey) {
+            const existingOrder = await Order.findOne({ idempotencyKey });
+            if (existingOrder) {
+                console.log(`[Idempotency Check] Duplicate checkout attempt blocked. Order ID: ${existingOrder._id}`);
+                return res.status(200).json(existingOrder);
             }
         }
 
+        // Step 2: Atomic stock check & reservation (concurrency safe)
+        const reservedProducts = [];
+        let stockCheckPassed = true;
+        let stockErrorMessage = "";
+
+        for (const item of orderItems) {
+            const product = await Product.findOneAndUpdate(
+                { _id: item.product, countInStock: { $gte: item.qty } },
+                { $inc: { countInStock: -item.qty } },
+                { new: true }
+            );
+
+            if (!product) {
+                stockCheckPassed = false;
+                stockErrorMessage = `Insufficient stock or product not found: ${item.name}`;
+                break;
+            }
+            reservedProducts.push({ product: item.product, qty: item.qty });
+        }
+
+        if (!stockCheckPassed) {
+            // Rollback previously reserved items
+            for (const resItem of reservedProducts) {
+                await Product.findByIdAndUpdate(resItem.product, {
+                    $inc: { countInStock: resItem.qty }
+                });
+            }
+            return res.status(400).json({ message: stockErrorMessage });
+        }
+
+        // Create the order object
         const order = new Order({
             orderItems,
             user: req.user._id,
@@ -115,6 +143,7 @@ const addOrderItems = async (req, res) => {
             itemsPrice,
             shippingPrice,
             totalPrice,
+            idempotencyKey: idempotencyKey || undefined,
             orderTimeline: [{
                 status: "order placed",
                 timestamp: new Date(),
@@ -127,15 +156,11 @@ const addOrderItems = async (req, res) => {
         // Auto-save address to user profile if it's unique
         await autoSaveAddress(req.user._id, shippingAddress);
 
-        // Decrement stock for all ordered items
-        await decrementStock(orderItems);
-
         // Send order placed notification
         sendShippingNotification(createdOrder, "order_placed").catch(e => console.error(e));
 
         // If Cash on Delivery, trigger Shiprocket immediately since it's confirmed
         if (paymentMethod === "Cash on Delivery") {
-            // Check settings for automatic Shiprocket fulfillment
             let isAutoShiprocket = true;
             try {
                 const autoSRSetting = await Settings.findOne({ key: "autoShiprocket" });
@@ -156,6 +181,17 @@ const addOrderItems = async (req, res) => {
                         if (fulfillment.courierName) createdOrder.courierName = fulfillment.courierName;
                         if (fulfillment.trackingUrl) createdOrder.trackingUrl = fulfillment.trackingUrl;
                         createdOrder.orderStatus = "packed";
+                        createdOrder.fulfillmentStatus = "fulfilled";
+
+                        // Save in shipments array for production-grade audit
+                        createdOrder.shipments.push({
+                            shipmentId: fulfillment.shipmentId,
+                            awbCode: fulfillment.trackingId,
+                            courierName: fulfillment.courierName,
+                            status: "packed",
+                            shippedAt: new Date()
+                        });
+
                         createdOrder.orderTimeline.push({
                             status: "packed",
                             timestamp: new Date(),
@@ -239,76 +275,101 @@ const verifyRazorpayPayment = async (req, res) => {
         const isAuthentic = expectedSignature === razorpay_signature;
 
         if (isAuthentic) {
-            const order = await Order.findById(req.params.id);
-            if (order) {
-                order.isPaid = true;
-                order.paidAt = Date.now();
-                order.paymentResult = {
-                    id: razorpay_payment_id,
-                    status: "Completed",
-                    update_time: Date.now().toString()
-                };
-
-                // Add payment verified timeline entry
-                order.orderTimeline.push({
-                    status: "processing",
-                    timestamp: new Date(),
-                    description: "Payment verified successfully. Order processing."
-                });
-
-                // Send order placed notification
-                sendShippingNotification(order, "order_placed").catch(e => console.error(e));
-
-                // Check settings for automatic Shiprocket fulfillment
-                let isAutoShiprocket = true;
-                try {
-                    const autoSRSetting = await Settings.findOne({ key: "autoShiprocket" });
-                    if (autoSRSetting && autoSRSetting.value === false) {
-                        isAutoShiprocket = false;
-                    }
-                } catch (err) {
-                    console.error("Failed to read settings, defaulting to true:", err.message);
-                }
-
-                if (isAutoShiprocket) {
-                    try {
-                        // Trigger Shiprocket fulfillment for Prepaid orders
-                        const fulfillment = await processShiprocketFulfillment(order);
-                        if (fulfillment) {
-                            if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
-                            if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
-                            if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                            if (fulfillment.courierName) order.courierName = fulfillment.courierName;
-                            if (fulfillment.trackingUrl) order.trackingUrl = fulfillment.trackingUrl;
-                            order.orderStatus = "packed";
-                            order.orderTimeline.push({
-                                status: "packed",
-                                timestamp: new Date(),
-                                description: `Shipment created automatically with ${fulfillment.courierName}. AWB: ${fulfillment.trackingId}`
-                            });
-
-                            // Send shipment created notification
-                            sendShippingNotification(order, "shipment_created").catch(e => console.error(e));
+            // Concurrency Control: atomically mark order as paid to prevent duplicate processing
+            let order = await Order.findOneAndUpdate(
+                { _id: req.params.id, isPaid: false },
+                {
+                    $set: {
+                        isPaid: true,
+                        paidAt: Date.now(),
+                        paymentResult: {
+                            id: razorpay_payment_id,
+                            status: "Completed",
+                            update_time: Date.now().toString()
                         }
-                    } catch (shiprocketErr) {
-                        console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
                     }
-                } else {
-                    console.log("Automatic Shiprocket fulfillment is disabled (OFF). Skipping fulfillment for Prepaid order.");
-                }
+                },
+                { new: true }
+            );
 
-                const updatedOrder = await order.save();
-                res.json(updatedOrder);
-            } else {
-                res.status(404).json({ message: "Order not found" });
+            if (!order) {
+                // If order was already paid, fetch and return it to prevent duplicate runs
+                const checkOrder = await Order.findById(req.params.id);
+                if (checkOrder && checkOrder.isPaid) {
+                    console.log(`[Verify Payment] Payment already processed for order: ${req.params.id}`);
+                    return res.json(checkOrder);
+                }
+                return res.status(404).json({ message: "Order not found" });
             }
+
+            // Add payment verified timeline entry
+            order.orderTimeline.push({
+                status: "processing",
+                timestamp: new Date(),
+                description: "Payment verified successfully. Order processing."
+            });
+
+            // Send order placed notification
+            sendShippingNotification(order, "order_placed").catch(e => console.error(e));
+
+            // Check settings for automatic Shiprocket fulfillment
+            let isAutoShiprocket = true;
+            try {
+                const autoSRSetting = await Settings.findOne({ key: "autoShiprocket" });
+                if (autoSRSetting && autoSRSetting.value === false) {
+                    isAutoShiprocket = false;
+                }
+            } catch (err) {
+                console.error("Failed to read settings, defaulting to true:", err.message);
+            }
+
+            if (isAutoShiprocket) {
+                try {
+                    // Trigger Shiprocket fulfillment for Prepaid orders
+                    const fulfillment = await processShiprocketFulfillment(order);
+                    if (fulfillment) {
+                        if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
+                        if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
+                        if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
+                        if (fulfillment.courierName) order.courierName = fulfillment.courierName;
+                        if (fulfillment.trackingUrl) order.trackingUrl = fulfillment.trackingUrl;
+                        order.orderStatus = "packed";
+                        order.fulfillmentStatus = "fulfilled";
+
+                        // Log shipment inside the database shipments array
+                        order.shipments.push({
+                            shipmentId: fulfillment.shipmentId,
+                            awbCode: fulfillment.trackingId,
+                            courierName: fulfillment.courierName,
+                            status: "packed",
+                            shippedAt: new Date()
+                        });
+
+                        order.orderTimeline.push({
+                            status: "packed",
+                            timestamp: new Date(),
+                            description: `Shipment created automatically with ${fulfillment.courierName}. AWB: ${fulfillment.trackingId}`
+                        });
+
+                        // Send shipment created notification
+                        sendShippingNotification(order, "shipment_created").catch(e => console.error(e));
+                    }
+                } catch (shiprocketErr) {
+                    console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
+                }
+            } else {
+                console.log("Automatic Shiprocket fulfillment is disabled (OFF). Skipping fulfillment for Prepaid order.");
+            }
+
+            const updatedOrder = await order.save();
+            res.json(updatedOrder);
         } else {
             res.status(400).json({ message: "Invalid Signature" });
         }
     } catch (error) {
         res.status(500).json({ message: "Verification Error", error: error.message });
     }
-}
+};
 
 // @desc    Update order to delivered/status
 // @route   PUT /api/orders/:id/status
@@ -397,9 +458,31 @@ const cancelOrder = async (req, res) => {
         }
 
         order.orderStatus = "cancelled";
+        order.fulfillmentStatus = "cancelled";
 
         // Restore stock
         await restoreStock(order.orderItems);
+
+        // Cancel order on Shiprocket if active shipment exists
+        if (order.shiprocketOrderId) {
+            const { cancelShiprocketOrder } = require("../utils/shiprocket");
+            console.log(`Cancelling Shiprocket order: ${order.shiprocketOrderId}`);
+            await cancelShiprocketOrder(order.shiprocketOrderId).catch(err => {
+                console.error("Failed to cancel order on Shiprocket API:", err.message);
+            });
+            
+            order.orderTimeline.push({
+                status: "cancelled",
+                timestamp: new Date(),
+                description: `Order cancelled. Shiprocket cancellation request sent for Order ID: ${order.shiprocketOrderId}.`
+            });
+        } else {
+            order.orderTimeline.push({
+                status: "cancelled",
+                timestamp: new Date(),
+                description: "Order cancelled successfully."
+            });
+        }
 
         const updatedOrder = await order.save();
         res.json(updatedOrder);
