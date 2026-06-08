@@ -85,7 +85,15 @@ router.post("/calculate-rates", protect, async (req, res) => {
         result.rates.forEach(courier => {
             const etdHours = Number(courier.etd_hours || 72);
             const deliveryDays = Math.ceil(etdHours / 24) || 3;
-            const isExpressSpeed = deliveryDays <= 3; // Delivered within 3 days is Express
+
+            // Classify by courier TYPE (Surface/Ground = Standard, Air/Express/Priority = Express)
+            const courierName = (courier.courier_name || "").toLowerCase();
+            const isAirCourier = courierName.includes("air") || 
+                                 courierName.includes("express") || 
+                                 courierName.includes("priority") ||
+                                 courierName.includes("premium");
+            // Surface, Ground, Lite, Economy, or anything else = Standard
+            const isExpressType = isAirCourier;
 
             const baseCharge = Number(courier.rate);
             let charge = baseCharge;
@@ -106,10 +114,7 @@ router.post("/calculate-rates", protect, async (req, res) => {
                 codAvailable: courier.cod === 1
             };
 
-            if (isExpressSpeed) {
-                if (shippingSettings.expressDeliveryEnabled) {
-                    mappedCourier.cost += shippingSettings.expressDeliveryCharges;
-                }
+            if (isExpressType) {
                 expressCouriers.push(mappedCourier);
             } else {
                 standardCouriers.push(mappedCourier);
@@ -128,11 +133,11 @@ router.post("/calculate-rates", protect, async (req, res) => {
                 price: cheapestStandard.cost,
                 estimatedDays: cheapestStandard.deliveryDays,
                 codAvailable: cheapestStandard.codAvailable,
-                description: "Reliable surface shipping (3-6 business days)"
+                description: `Reliable surface shipping (${cheapestStandard.deliveryDays}-${cheapestStandard.deliveryDays + 2} business days)`
             });
         }
 
-        // Select the cheapest partner for Express Delivery
+        // Select the cheapest partner for Express Delivery (only if it's actually faster than Standard)
         if (expressCouriers.length > 0) {
             expressCouriers.sort((a, b) => a.cost - b.cost);
             const cheapestExpress = expressCouriers[0];
@@ -142,11 +147,11 @@ router.post("/calculate-rates", protect, async (req, res) => {
                 price: cheapestExpress.cost,
                 estimatedDays: cheapestExpress.deliveryDays,
                 codAvailable: cheapestExpress.codAvailable,
-                description: "Priority air shipping (1-3 business days)"
+                description: `Priority air shipping (${cheapestExpress.deliveryDays}-${cheapestExpress.deliveryDays + 1} business days)`
             });
         }
 
-        // Fallback: If no express but standard exists, or vice versa, ensure we have at least one option
+        // Fallback: ensure at least one option
         if (deliveryOptions.length === 0 && result.rates.length > 0) {
             const cheapestOverall = [...result.rates].sort((a, b) => Number(a.rate) - Number(b.rate))[0];
             deliveryOptions.push({
