@@ -102,6 +102,10 @@ const calculateShippingRates = async (deliveryPincode, items, paymentMethod) => 
             settings = { ...settings, ...settingsDoc.value };
         }
 
+        // Force correct pickup pincode (Hyderabad) regardless of DB value
+        settings.pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "500070";
+        console.log(`[Shipping] Using pickup postcode: ${settings.pickupPostcode}`);
+
         // 3. Weight calculation: Sum of (product weight * quantity)
         let totalWeight = 0;
         for (const item of items) {
@@ -461,7 +465,7 @@ const createReverseShipment = async (order, reason) => {
         // Load settings
         let settings = {
             pickupLocation: process.env.SHIPROCKET_PICKUP_LOCATION || "Home",
-            pickupPostcode: "110001",
+            pickupPostcode: "500070",
             defaultWeight: 0.1,
             defaultLength: 10,
             defaultWidth: 10,
@@ -471,6 +475,9 @@ const createReverseShipment = async (order, reason) => {
         if (settingsDoc && settingsDoc.value) {
             settings = { ...settings, ...settingsDoc.value };
         }
+
+        // Force correct pickup pincode (Hyderabad) regardless of DB value
+        settings.pickupPostcode = process.env.SHIPROCKET_PICKUP_POSTCODE || "500070";
 
         // Calculate dynamic dimensions and weights
         let totalWeight = 0;
