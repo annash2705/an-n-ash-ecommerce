@@ -144,15 +144,9 @@ export default function CheckoutPage() {
                         const city = addr.city || addr.town || addr.village || addr.suburb || "";
                         const state = addr.state || "";
                         const pincode = addr.postcode || "";
-                        
-                        // Extract street/neighborhood
-                        const road = addr.road || addr.suburb || addr.neighbourhood || "";
-                        const district = addr.city_district || addr.subdistrict || "";
-                        const streetDetails = road && district ? `${road}, ${district}` : (road || district);
 
                         setAddress((prev) => ({
                             ...prev,
-                            street: streetDetails,
                             city,
                             state,
                             pincode,
@@ -161,7 +155,6 @@ export default function CheckoutPage() {
                         // Clear location errors
                         setErrors((prev) => ({
                             ...prev,
-                            street: "",
                             city: "",
                             state: "",
                             pincode: "",
