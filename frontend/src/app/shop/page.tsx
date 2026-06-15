@@ -89,7 +89,7 @@ function ShopContent() {
         setFilteredProducts(result);
     }, [category, sort, products, searchKeyword]);
 
-    const categories = ["All", "Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"];
+    const categories = ["All", "Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings", "Bag Charms", "Bracelets"];
 
     return (
         <div className="bg-cream min-h-screen py-16">

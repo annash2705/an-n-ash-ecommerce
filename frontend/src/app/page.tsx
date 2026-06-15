@@ -40,6 +40,8 @@ export default async function Home() {
     "Arm Cuffs": "◇",
     "Hair Accessories": "✿",
     "Rings": "○",
+    "Bag Charms": "❀",
+    "Bracelets": "⟡",
   };
 
   return (
@@ -256,8 +258,8 @@ export default async function Home() {
             <h2 className="text-3xl md:text-4xl font-serif text-foreground">Shop by Category</h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
-            {["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"].map((category, i) => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-6 md:gap-8">
+            {["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings", "Bag Charms", "Bracelets"].map((category, i) => (
               <Link
                 href={`/shop?category=${category}`}
                 key={category}

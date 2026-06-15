@@ -7,7 +7,7 @@ import api from "@/lib/axios";
 import { Button } from "@/components/ui/Button";
 import { getOptimizedImageUrl } from "@/lib/cloudinary";
 
-const CATEGORIES = ["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings"];
+const CATEGORIES = ["Necklaces", "Earrings", "Arm Cuffs", "Hair Accessories", "Rings", "Bag Charms", "Bracelets"];
 
 export default function ProductEditPage() {
     const router = useRouter();

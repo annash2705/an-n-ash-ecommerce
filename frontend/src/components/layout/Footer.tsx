@@ -39,6 +39,8 @@ export const Footer = () => {
                                 { href: '/shop?category=Arm Cuffs', label: 'Arm Cuffs' },
                                 { href: '/shop?category=Hair Accessories', label: 'Hair Accessories' },
                                 { href: '/shop?category=Rings', label: 'Rings' },
+                                { href: '/shop?category=Bag Charms', label: 'Bag Charms' },
+                                { href: '/shop?category=Bracelets', label: 'Bracelets' },
                                 { href: '/custom-orders', label: 'Custom Orders' },
                             ].map((link) => (
                                 <li key={link.href}>

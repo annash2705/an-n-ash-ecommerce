@@ -87,12 +87,12 @@ export default function CartPage() {
                                         <dd className="font-medium text-foreground">₹{cartTotal}</dd>
                                     </div>
                                     <div className="flex items-center justify-between border-t border-beige/60 pt-4">
-                                        <dt>Shipping estimate</dt>
-                                        <dd className="font-medium text-foreground">₹{cartTotal > 0 ? 100 : 0}</dd>
+                                        <dt>Shipping</dt>
+                                        <dd className="font-medium text-green-600 font-semibold">Free</dd>
                                     </div>
                                     <div className="flex items-center justify-between border-t border-beige/60 pt-4 text-lg font-medium text-foreground">
                                         <dt>Order total</dt>
-                                        <dd className="text-gold font-semibold">₹{cartTotal > 0 ? cartTotal + 100 : 0}</dd>
+                                        <dd className="text-gold font-semibold">₹{cartTotal}</dd>
                                     </div>
                                 </dl>
                                 <div className="mt-8">
