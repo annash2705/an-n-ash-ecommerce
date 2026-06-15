@@ -283,18 +283,30 @@ router.post("/webhook", async (req, res) => {
             return res.status(200).json({ message: "AWB code is missing in webhook payload" });
         }
 
-        // Find order by trackingId (AWB) or reverseAwbCode, or inside shipments array
-        let order = await Order.findOne({
-            $or: [
-                { trackingId: awbCode },
-                { "returnDetails.reverseAwbCode": awbCode },
-                { "shipments.awbCode": awbCode }
-            ]
-        });
+        const orderIdFromPayload = payload.order_id;
+        let order = null;
+        const mongoose = require("mongoose");
+        if (orderIdFromPayload) {
+            const cleanOrderId = orderIdFromPayload.replace(/^DEV-/, "");
+            if (mongoose.Types.ObjectId.isValid(cleanOrderId)) {
+                order = await Order.findById(cleanOrderId);
+            }
+        }
 
         if (!order) {
-            console.warn(`Webhook received for untracked AWB: ${awbCode}`);
-            return res.status(200).json({ message: "AWB not found in system, but payload logged." });
+            // Find order by trackingId (AWB) or reverseAwbCode, or inside shipments array
+            order = await Order.findOne({
+                $or: [
+                    { trackingId: awbCode },
+                    { "returnDetails.reverseAwbCode": awbCode },
+                    { "shipments.awbCode": awbCode }
+                ]
+            });
+        }
+
+        if (!order) {
+            console.warn(`Webhook received for untracked AWB: ${awbCode}, Order ID: ${orderIdFromPayload}`);
+            return res.status(200).json({ message: "Order or AWB not found in system, but payload logged." });
         }
 
         let isReverse = order.returnDetails?.reverseAwbCode === awbCode;
@@ -302,15 +314,26 @@ router.post("/webhook", async (req, res) => {
         let eventType = "";
         let description = "";
 
+        // Dynamically assign tracking details if they were empty
+        if (awbCode && !order.trackingId && !isReverse) {
+            order.trackingId = awbCode;
+            order.courierName = payload.courier_name || "Shiprocket Partner";
+            order.trackingUrl = `https://shiprocket.co/tracking/${awbCode}`;
+            localStatus = "packed";
+            description = `Courier partner assigned: ${order.courierName}. Tracking ID (AWB): ${awbCode}`;
+            console.log(`[Webhook] Dynamically assigned trackingId ${awbCode} and courier ${order.courierName} to order ${order._id}`);
+        }
+
         // Find the matched shipment item in order's shipments array
         let shipmentIndex = order.shipments.findIndex(s => s.awbCode === awbCode);
-        if (shipmentIndex === -1 && order.shipmentId === awbCode) {
-            // Backfill if empty
+        if (shipmentIndex === -1 && awbCode) {
+            // Backfill / add shipment details
             order.shipments.push({
-                shipmentId: order.shipmentId,
-                awbCode: order.trackingId,
-                courierName: order.courierName || "Shiprocket Partner",
-                status: currentStatus
+                shipmentId: order.shipmentId || payload.shipment_id || "N/A",
+                awbCode: awbCode,
+                courierName: order.courierName || payload.courier_name || "Shiprocket Partner",
+                status: currentStatus,
+                shippedAt: new Date()
             });
             shipmentIndex = order.shipments.length - 1;
         }

@@ -51,8 +51,6 @@ export default function CheckoutPage() {
 
     const [paymentMethod, setPaymentMethod] = useState("Razorpay");
     const [loading, setLoading] = useState(false);
-    const [shippingOptions, setShippingOptions] = useState<Array<{service:string;price:number;estimatedDays:number;courierId?:string}>>([]);
-    const [selectedShipping, setSelectedShipping] = useState<{service:string;price:number;estimatedDays:number;courierId?:string} | null>(null);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [checkoutId, setCheckoutId] = useState("");
 
@@ -215,29 +213,7 @@ export default function CheckoutPage() {
         return Object.keys(newErrors).length === 0;
 };
 
-useEffect(() => {
-      const fetchRates = async () => {
-        if (/^\d{6}$/.test(address.pincode)) {
-          try {
-            const { data } = await api.post('/shipping/calculate-rates', {
-              pincode: address.pincode,
-              items: cartItems,
-              paymentMethod,
-            });
-            setShippingOptions(data.rates || []);
-            setSelectedShipping(null);
-          } catch (err) {
-            console.error('Failed to fetch shipping rates', err);
-            setShippingOptions([]);
-            setSelectedShipping(null);
-          }
-        } else {
-          setShippingOptions([]);
-          setSelectedShipping(null);
-        }
-      };
-      fetchRates();
-}, [address.pincode, paymentMethod, JSON.stringify(cartItems)]);
+
 
     const placeOrderHandler = async () => {
         if (!validateForm()) return;
@@ -248,10 +224,10 @@ useEffect(() => {
                 shippingAddress: address, 
                 paymentMethod, 
                 itemsPrice: cartTotal, 
-                shippingPrice: selectedShipping?.price || 0, 
-                totalPrice: cartTotal + (selectedShipping?.price || 0),
+                shippingPrice: 0, 
+                codPrice: paymentMethod === "Cash on Delivery" ? 100 : 0,
+                totalPrice: cartTotal + (paymentMethod === "Cash on Delivery" ? 100 : 0),
                 idempotencyKey: checkoutId,
-                courierId: selectedShipping?.courierId || undefined,
             };
             const { data } = await api.post("/orders", orderData);
             if (paymentMethod === "Razorpay") {
@@ -498,28 +474,6 @@ useEffect(() => {
                                     <input type="text" name="country" value="India" readOnly className="input-elegant bg-beige/30 cursor-not-allowed" />
                                 </div>
                             </div>
-                            {shippingOptions.length > 0 && (
-                                <div className="card-premium p-6 sm:p-8 mt-6">
-                                    <h2 className="text-2xl font-serif mb-4">Shipping Options</h2>
-                                    <div className="space-y-4">
-                                        {shippingOptions.map((opt, idx) => (
-                                            <label key={idx} className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${selectedShipping?.service===opt.service ? 'border-gold bg-gold/5' : 'border-beige hover:border-gold-light'}`}>
-                                                <input
-                                                    type="radio"
-                                                    name="shippingOption"
-                                                    value={opt.service}
-                                                    checked={selectedShipping?.service===opt.service}
-                                                    onChange={() => setSelectedShipping(opt)}
-                                                    className="text-gold focus:ring-gold"
-                                                />
-                                                <span className="ml-3 text-foreground font-medium">
-                                                    {opt.service} - ₹{opt.price} ({opt.estimatedDays} days)
-                                                </span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
                         {/* Payment Selection */}
@@ -527,11 +481,16 @@ useEffect(() => {
                             <h2 className="text-2xl font-serif mb-5">Payment Method</h2>
                             <div className="space-y-4">
                                 <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${paymentMethod === 'Razorpay' ? 'border-gold bg-gold/5' : 'border-beige hover:border-gold-light'}`}>
-                                    <input type="radio" name="paymentMethod" value="Razorpay" checked={paymentMethod === "Razorpay"} onChange={(e) => setPaymentMethod(e.target.value)} className="text-gold focus:ring-gold" />
+                                    <input type="radio" name="paymentMethod" value="Razorpay" checked={paymentMethod === "Razorpay"} onChange={() => setPaymentMethod("Razorpay")} className="text-gold focus:ring-gold" />
                                     <span className="ml-3 text-foreground font-medium">Razorpay (Cards, UPI, NetBanking)</span>
                                 </label>
                                 <label className={`flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-300 ${paymentMethod === 'Cash on Delivery' ? 'border-gold bg-gold/5' : 'border-beige hover:border-gold-light'}`}>
-                                    <input type="radio" name="paymentMethod" value="Cash on Delivery" checked={paymentMethod === "Cash on Delivery"} onChange={(e) => setPaymentMethod(e.target.value)} className="text-gold focus:ring-gold" />
+                                    <input type="radio" name="paymentMethod" value="Cash on Delivery" checked={paymentMethod === "Cash on Delivery"} onChange={() => {
+                                        const confirmCOD = window.confirm("COD will add an additional ₹100 to the bill. Do you want to proceed?");
+                                        if (confirmCOD) {
+                                            setPaymentMethod("Cash on Delivery");
+                                        }
+                                    }} className="text-gold focus:ring-gold" />
                                     <span className="ml-3 text-foreground font-medium">Cash on Delivery</span>
                                 </label>
                             </div>
@@ -554,9 +513,20 @@ useEffect(() => {
                                 <div className="flex justify-between"><dt>Subtotal</dt><dd className="font-medium text-foreground">₹{cartTotal}</dd></div>
                                 <div className="flex justify-between border-t border-beige/60 pt-4">
                                     <dt>Shipping</dt>
-                                    <dd className="font-medium text-foreground">₹{selectedShipping?.price || 0}</dd>
+                                    <dd className="font-medium text-green-600 font-semibold">Free</dd>
                                 </div>
-                                <div className="flex justify-between border-t border-beige/60 pt-4 text-lg font-medium text-foreground"><dt>Total</dt><dd className="text-gold font-semibold text-xl">₹{cartTotal > 0 ? cartTotal + (selectedShipping?.price || 0) : 0}</dd></div>
+                                {paymentMethod === "Cash on Delivery" && (
+                                    <div className="flex justify-between border-t border-beige/60 pt-4">
+                                        <dt>COD Surcharge</dt>
+                                        <dd className="font-medium text-foreground">₹100</dd>
+                                    </div>
+                                )}
+                                <div className="flex justify-between border-t border-beige/60 pt-4 text-lg font-medium text-foreground">
+                                    <dt>Total</dt>
+                                    <dd className="text-gold font-semibold text-xl">
+                                        ₹{cartTotal > 0 ? cartTotal + (paymentMethod === "Cash on Delivery" ? 100 : 0) : 0}
+                                    </dd>
+                                </div>
                             </dl>
                             <div className="mt-8">
                                 <Button fullWidth size="lg" onClick={placeOrderHandler} disabled={cartItems.length === 0 || loading}>{loading ? "Processing..." : "Place Order"}</Button>

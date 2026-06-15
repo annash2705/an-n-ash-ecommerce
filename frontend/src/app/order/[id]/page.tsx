@@ -285,8 +285,14 @@ export default function OrderDetailsPage() {
                                 </div>
                                 <div className="flex justify-between">
                                     <dt>Shipping Price</dt>
-                                    <dd>₹{order.shippingPrice}</dd>
+                                    <dd>{order.shippingPrice > 0 ? `₹${order.shippingPrice}` : "Free"}</dd>
                                 </div>
+                                {order.codPrice > 0 && (
+                                    <div className="flex justify-between">
+                                        <dt>COD Surcharge</dt>
+                                        <dd>₹{order.codPrice}</dd>
+                                    </div>
+                                )}
                                 <div className="flex justify-between border-t border-beige pt-4 font-semibold text-base">
                                     <dt>Total Price</dt>
                                     <dd className="text-gold">₹{order.totalPrice}</dd>

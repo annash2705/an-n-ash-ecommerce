@@ -86,6 +86,7 @@ const addOrderItems = async (req, res) => {
         paymentMethod,
         itemsPrice,
         shippingPrice,
+        codPrice,
         totalPrice,
         idempotencyKey,
         courierId,
@@ -143,6 +144,7 @@ const addOrderItems = async (req, res) => {
             paymentMethod,
             itemsPrice,
             shippingPrice,
+            codPrice: codPrice || (paymentMethod === "Cash on Delivery" ? 100 : 0),
             totalPrice,
             idempotencyKey: idempotencyKey || undefined,
             courierId: courierId || undefined,
@@ -175,35 +177,17 @@ const addOrderItems = async (req, res) => {
 
             if (isAutoShiprocket) {
                 try {
-                    // Pass the locked courier ID selected at checkout
-                    const fulfillment = await processShiprocketFulfillment(createdOrder, createdOrder.courierId);
+                    const fulfillment = await processShiprocketFulfillment(createdOrder);
                     if (fulfillment) {
-                        if (fulfillment.trackingId) createdOrder.trackingId = fulfillment.trackingId;
                         if (fulfillment.shipmentId) createdOrder.shipmentId = fulfillment.shipmentId;
                         if (fulfillment.shiprocketOrderId) createdOrder.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                        if (fulfillment.courierName) createdOrder.courierName = fulfillment.courierName;
-                        if (fulfillment.trackingUrl) createdOrder.trackingUrl = fulfillment.trackingUrl;
-                        createdOrder.orderStatus = "packed";
-                        createdOrder.fulfillmentStatus = "fulfilled";
-
-                        // Save in shipments array for production-grade audit
-                        createdOrder.shipments.push({
-                            shipmentId: fulfillment.shipmentId,
-                            awbCode: fulfillment.trackingId,
-                            courierName: fulfillment.courierName,
-                            status: "packed",
-                            shippedAt: new Date()
-                        });
-
+                        
                         createdOrder.orderTimeline.push({
-                            status: "packed",
+                            status: "order placed",
                             timestamp: new Date(),
-                            description: `Shipment created automatically with ${fulfillment.courierName}. AWB: ${fulfillment.trackingId}`
+                            description: `Synced to Shiprocket. Shiprocket Order ID: ${fulfillment.shiprocketOrderId}`
                         });
                         await createdOrder.save();
-
-                        // Send shipment created notification
-                        sendShippingNotification(createdOrder, "shipment_created").catch(e => console.error(e));
                     }
                 } catch (srErr) {
                     console.error("Shiprocket failed during COD, but order is saved.", srErr.message);
@@ -328,34 +312,16 @@ const verifyRazorpayPayment = async (req, res) => {
 
             if (isAutoShiprocket) {
                 try {
-                    // Trigger Shiprocket fulfillment for Prepaid orders using checkout locked courier
-                    const fulfillment = await processShiprocketFulfillment(order, order.courierId);
+                    const fulfillment = await processShiprocketFulfillment(order);
                     if (fulfillment) {
-                        if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
                         if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
                         if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
-                        if (fulfillment.courierName) order.courierName = fulfillment.courierName;
-                        if (fulfillment.trackingUrl) order.trackingUrl = fulfillment.trackingUrl;
-                        order.orderStatus = "packed";
-                        order.fulfillmentStatus = "fulfilled";
-
-                        // Log shipment inside the database shipments array
-                        order.shipments.push({
-                            shipmentId: fulfillment.shipmentId,
-                            awbCode: fulfillment.trackingId,
-                            courierName: fulfillment.courierName,
-                            status: "packed",
-                            shippedAt: new Date()
-                        });
-
+                        
                         order.orderTimeline.push({
-                            status: "packed",
+                            status: "processing",
                             timestamp: new Date(),
-                            description: `Shipment created automatically with ${fulfillment.courierName}. AWB: ${fulfillment.trackingId}`
+                            description: `Payment verified. Synced to Shiprocket. Shiprocket Order ID: ${fulfillment.shiprocketOrderId}`
                         });
-
-                        // Send shipment created notification
-                        sendShippingNotification(order, "shipment_created").catch(e => console.error(e));
                     }
                 } catch (shiprocketErr) {
                     console.error("Shiprocket API failed during verification, but payment was captured:", shiprocketErr.message);
@@ -595,21 +561,16 @@ const retryShiprocketFulfillment = async (req, res) => {
 
         const fulfillment = await processShiprocketFulfillment(order);
         if (fulfillment) {
-            if (fulfillment.trackingId) order.trackingId = fulfillment.trackingId;
             if (fulfillment.shipmentId) order.shipmentId = fulfillment.shipmentId;
             if (fulfillment.shiprocketOrderId) order.shiprocketOrderId = fulfillment.shiprocketOrderId;
-            if (fulfillment.courierName) order.courierName = fulfillment.courierName;
-            if (fulfillment.trackingUrl) order.trackingUrl = fulfillment.trackingUrl;
             
-            order.orderStatus = "packed";
             order.orderTimeline.push({
-                status: "packed",
+                status: order.orderStatus,
                 timestamp: new Date(),
-                description: `Shipment created via retry. Courier: ${fulfillment.courierName}. AWB: ${fulfillment.trackingId}`
+                description: `Synced to Shiprocket manually. Shiprocket Order ID: ${fulfillment.shiprocketOrderId}`
             });
 
             const updatedOrder = await order.save();
-            await sendShippingNotification(updatedOrder, "shipment_created");
             res.json(updatedOrder);
         } else {
             res.status(400).json({ message: "Shiprocket order creation returned empty response." });

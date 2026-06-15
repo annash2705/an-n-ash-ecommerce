@@ -279,7 +279,9 @@ const createShiprocketOrder = async (orderDetails) => {
             pickup_location: settings.pickupLocation,
             billing_customer_name: orderDetails.shippingAddress.name.split(' ')[0] || "Customer",
             billing_last_name: orderDetails.shippingAddress.name.split(' ').slice(1).join(' ') || "",
-            billing_address: orderDetails.shippingAddress.street,
+            billing_address: orderDetails.shippingAddress.street.trim().length >= 10
+                ? orderDetails.shippingAddress.street.trim()
+                : `${orderDetails.shippingAddress.street.trim()}, ${orderDetails.shippingAddress.city}`,
             billing_city: orderDetails.shippingAddress.city,
             billing_pincode: orderDetails.shippingAddress.pincode,
             billing_state: orderDetails.shippingAddress.state,
@@ -289,9 +291,10 @@ const createShiprocketOrder = async (orderDetails) => {
             shipping_is_billing: true,
             order_items: orderItemsMapped,
             payment_method: orderDetails.paymentMethod === "Cash on Delivery" ? "COD" : "Prepaid",
-            shipping_charges: orderDetails.shippingPrice,
+            cod: orderDetails.paymentMethod === "Cash on Delivery" ? orderDetails.totalPrice : 0,
+            shipping_charges: orderDetails.shippingPrice || 0,
             giftwrap_charges: 0,
-            transaction_charges: 0,
+            transaction_charges: orderDetails.codPrice || 0,
             total_discount: 0,
             sub_total: orderDetails.itemsPrice,
             length: box.length,
@@ -399,42 +402,23 @@ const schedulePickup = async (shipmentId) => {
 
 const processShiprocketFulfillment = async (order, courierId = null) => {
     try {
-        console.log(`Processing Shiprocket fulfillment for order ${order._id}`);
+        console.log(`Pushing order ${order._id} to Shiprocket...`);
         // 1. Create Order in Shiprocket
         const srOrder = await createShiprocketOrder(order);
         
         console.log("SHIPROCKET API RAW RESPONSE:", JSON.stringify(srOrder));
 
         if (srOrder && srOrder.shipment_id) {
-            // 2. Assign AWB (Auto-generate shipping label tracking)
-            const awbRes = await generateAWB(srOrder.shipment_id, courierId);
-
-            let trackingId = null;
-            let courierName = null;
-            if (awbRes && awbRes.response && awbRes.response.data && awbRes.response.data.awb_code) {
-                trackingId = awbRes.response.data.awb_code;
-                courierName = awbRes.response.data.courier_name || "Shiprocket Partner";
-
-                // 3. Automatically schedule pickup
-                try {
-                    console.log(`Scheduling Shiprocket pickup for shipment ${srOrder.shipment_id}`);
-                    const pickupRes = await schedulePickup(srOrder.shipment_id);
-                    console.log("SHIPROCKET PICKUP RAW RESPONSE:", JSON.stringify(pickupRes));
-                } catch (pickupErr) {
-                    console.error("Failed to auto-schedule pickup:", pickupErr.message);
-                }
-            }
-
             return {
                 shiprocketOrderId: srOrder.order_id,
                 shipmentId: srOrder.shipment_id,
-                trackingId: trackingId,
-                courierName: courierName,
-                trackingUrl: trackingId ? `https://shiprocket.co/tracking/${trackingId}` : null
+                trackingId: null,
+                courierName: null,
+                trackingUrl: null
             };
         }
 
-        throw new Error("Shiprocket fulfillment failed. No shipment ID returned.");
+        throw new Error("Shiprocket order creation failed. No shipment ID returned.");
     } catch (error) {
         console.error("Shiprocket fulfillment error:", error.message);
         throw error;

@@ -36,7 +36,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         { label: "Dashboard", href: "/admin", icon: <LayoutDashboard size={20} /> },
         { label: "Products", href: "/admin/products", icon: <ShoppingBag size={20} /> },
         { label: "Orders", href: "/admin/orders", icon: <ClipboardList size={20} /> },
-        { label: "Shipping", href: "/admin/shipping", icon: <Truck size={20} /> },
         { label: "Custom Requests", href: "/admin/custom-requests", icon: <Inbox size={20} /> },
     ];
 
