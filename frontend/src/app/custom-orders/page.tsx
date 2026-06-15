@@ -25,6 +25,13 @@ const customPieces = [
         desc: "Graceful golden spirals cascade downward, suspending violet teardrop cat-eye beads that sway beautifully with every movement." 
     },
     { 
+        src: "/custom-work/piece-5.jpg", 
+        category: "Chandelier Earrings",
+        materials: "Silver Wire & Emerald Crystals",
+        title: "Emerald Palace Chandeliers", 
+        desc: "Intricately woven silver wire chandelier earrings adorned with vibrant emerald crystal beads and hanging chain drops." 
+    },
+    { 
         src: "/custom-work/piece-6.jpg", 
         category: "Drop Earrings",
         materials: "14k Gold Wire & Natural Jade",
@@ -42,7 +49,7 @@ const customPieces = [
         src: "/custom-work/piece-8.jpg", 
         category: "Chandelier Earrings",
         materials: "Sterling Silver & Clear Crystals",
-        title: "Lunar Wind Chandeliers", 
+        title: "Celestia Spiral Drops", 
         desc: "Dreamy silver wire spirals adorned with delicate silver beads and hanging crystal teardrops that mimic falling rain." 
     },
     { 
@@ -132,7 +139,7 @@ export default function CustomOrdersPage() {
                         </div>
                     </div>
 
-                    {/* Row 2: 3-column details (4 cols each) - Amethyst Helix, Nouveau Emerald, Aurelia Rose */}
+                    {/* Row 2: 3-column details (4 cols each) - Amethyst Helix, Emerald Palace, Nouveau Emerald */}
                     <div 
                         className="lg:col-span-4 group cursor-pointer bg-white/60 backdrop-blur-md border border-gold/15 rounded-3xl shadow-sm hover:shadow-xl hover:border-gold/30 transition-all duration-700 ease-out overflow-hidden flex flex-col justify-between"
                         onClick={() => setSelectedImage(2)}
@@ -170,7 +177,7 @@ export default function CustomOrdersPage() {
                                 <img
                                     src={customPieces[3].src}
                                     alt={customPieces[3].title}
-                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.2s] ease-out"
+                                    className="w-full h-full object-cover object-[center_30%] group-hover:scale-105 transition-transform duration-[1.2s] ease-out"
                                 />
                             </div>
                         </div>
@@ -217,7 +224,7 @@ export default function CustomOrdersPage() {
                         </div>
                     </div>
 
-                    {/* Row 3: Lunar Wind Chandeliers (6 cols) & Editorial Quote Card (6 cols) */}
+                    {/* Row 3: Aurelia Rose Drops (6 cols) & Celestia Spiral Drops (6 cols) */}
                     <div 
                         className="lg:col-span-6 group cursor-pointer bg-white/60 backdrop-blur-md border border-gold/15 rounded-3xl shadow-sm hover:shadow-xl hover:border-gold/30 transition-all duration-700 ease-out overflow-hidden flex flex-col justify-between"
                         onClick={() => setSelectedImage(5)}
@@ -246,40 +253,56 @@ export default function CustomOrdersPage() {
                         </div>
                     </div>
 
-                    <div className="lg:col-span-6 flex flex-col justify-center items-center text-center p-8 md:p-12 bg-white/40 backdrop-blur-md border border-gold/15 rounded-3xl relative overflow-hidden min-h-[350px]">
-                        <div className="absolute -top-12 -left-12 w-24 h-24 bg-pink-soft/10 rounded-full blur-xl" />
-                        <div className="absolute -bottom-12 -right-12 w-24 h-24 bg-gold-light/10 rounded-full blur-xl" />
-                        
-                        <div className="text-gold/50 text-2xl mb-6 select-none">✦ ✦ ✦</div>
-                        <p className="text-foreground/80 font-serif text-lg md:text-xl italic leading-relaxed max-w-md">
-                            &ldquo;The beauty of handcrafted jewelry lies in its subtle character—the slight variations that capture the spirit of human touch.&rdquo;
-                        </p>
-                        <div className="gold-divider w-32 my-6"><div className="gold-divider-gem" /></div>
-                        <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-medium">An &amp; Ash Bespoke</span>
+                    <div 
+                        className="lg:col-span-6 group cursor-pointer bg-white/60 backdrop-blur-md border border-gold/15 rounded-3xl shadow-sm hover:shadow-xl hover:border-gold/30 transition-all duration-700 ease-out overflow-hidden flex flex-col justify-between"
+                        onClick={() => setSelectedImage(6)}
+                    >
+                        <div className="p-3 bg-cream/40 border-b border-gold/10">
+                            <div className="overflow-hidden rounded-2xl aspect-[4/5] relative">
+                                <img
+                                    src={customPieces[6].src}
+                                    alt={customPieces[6].title}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.2s] ease-out"
+                                />
+                            </div>
+                        </div>
+                        <div className="p-6 md:p-8 flex flex-col justify-between flex-grow">
+                            <div>
+                                <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-medium block mb-2">{customPieces[6].category}</span>
+                                <h3 className="text-xl font-serif text-foreground tracking-wide group-hover:text-gold transition-colors duration-500">{customPieces[6].title}</h3>
+                                <p className="text-foreground/75 text-sm mt-2 leading-relaxed font-sans font-light">{customPieces[6].desc}</p>
+                            </div>
+                            <div className="mt-6 pt-4 border-t border-beige/60 flex items-center justify-between">
+                                <span className="text-xs text-foreground/50 tracking-wider font-sans">{customPieces[6].materials}</span>
+                                <span className="text-xs uppercase tracking-widest text-gold font-medium inline-flex items-center gap-1.5 group-hover:translate-x-1.5 transition-transform duration-500">
+                                    Enquire <span className="text-[10px]">✦</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Row 4: Nouveau Lily Necklace (Landscape Hero - 12 cols) */}
                     <div 
                         className="lg:col-span-12 group cursor-pointer bg-white/60 backdrop-blur-md border border-gold/15 rounded-3xl shadow-sm hover:shadow-xl hover:border-gold/30 transition-all duration-700 ease-out overflow-hidden mt-2"
-                        onClick={() => setSelectedImage(6)}
+                        onClick={() => setSelectedImage(7)}
                     >
                         <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
                             <div className="lg:col-span-7 p-3 bg-cream/40 h-full border-b lg:border-b-0 lg:border-r border-gold/10">
                                 <div className="overflow-hidden rounded-2xl aspect-[4/3] md:aspect-[16/10] lg:aspect-[16/10] h-full">
                                     <img
-                                        src={customPieces[6].src}
-                                        alt={customPieces[6].title}
+                                        src={customPieces[7].src}
+                                        alt={customPieces[7].title}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-[1.2s] ease-out"
                                     />
                                 </div>
                             </div>
                             <div className="lg:col-span-5 p-8 lg:p-12 flex flex-col justify-center">
-                                <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-medium block mb-2">{customPieces[6].category}</span>
-                                <h3 className="text-2xl lg:text-3xl font-serif text-foreground tracking-wide group-hover:text-gold transition-colors duration-500 mb-4">{customPieces[6].title}</h3>
-                                <p className="text-foreground/75 text-sm lg:text-base leading-relaxed font-sans font-light mb-6">{customPieces[6].desc}</p>
+                                <span className="text-[10px] uppercase tracking-[0.25em] text-gold font-medium block mb-2">{customPieces[7].category}</span>
+                                <h3 className="text-2xl lg:text-3xl font-serif text-foreground tracking-wide group-hover:text-gold transition-colors duration-500 mb-4">{customPieces[7].title}</h3>
+                                <p className="text-foreground/75 text-sm lg:text-base leading-relaxed font-sans font-light mb-6">{customPieces[7].desc}</p>
                                 
                                 <div className="pt-6 border-t border-beige/60 flex items-center justify-between">
-                                    <span className="text-xs text-foreground/50 tracking-wider font-sans">{customPieces[6].materials}</span>
+                                    <span className="text-xs text-foreground/50 tracking-wider font-sans">{customPieces[7].materials}</span>
                                     <span className="text-xs uppercase tracking-widest text-gold font-medium inline-flex items-center gap-1.5 group-hover:translate-x-1.5 transition-transform duration-500">
                                         Enquire <span className="text-[10px]">✦</span>
                                     </span>
