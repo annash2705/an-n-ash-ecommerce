@@ -132,13 +132,8 @@ function RegisterContent() {
         setLoading(true);
         try {
             const { data } = await api.post("/users", { name, email, password });
-            setUserId(data.userId);
-            setEmail(data.email);
-            if (data.code) {
-                setReceivedEmailOtp(data.code);
-            }
-            setStep("verify-email");
-            syncUrl("verify-email", data.userId, data.email);
+            login(data);
+            router.push(redirect);
         } catch (err: any) {
             setError(err.response?.data?.message || "Registration failed. Please check your inputs.");
         } finally {

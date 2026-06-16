@@ -45,48 +45,26 @@ const registerUser = async (req, res) => {
     try {
         const userExists = await User.findOne({ email });
 
-        const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-        let user;
         if (userExists) {
-            if (userExists.isEmailVerified) {
-                return res.status(400).json({ message: "User already exists" });
-            }
-            // If email is not verified yet, allow re-signing up to resend code
-            userExists.name = name;
-            userExists.password = password;
-            userExists.emailVerificationCode = code;
-            user = await userExists.save();
-        } else {
-            user = await User.create({
-                name,
-                email,
-                password,
-                isEmailVerified: false,
-                isPhoneVerified: false,
-                emailVerificationCode: code
-            });
+            return res.status(400).json({ message: "User already exists" });
         }
 
-        if (user) {
-            sendEmail({
-                email: user.email,
-                subject: "Verify your email address - An.n.Ash",
-                html: `
-                    <h1>Welcome to An.n.Ash!</h1>
-                    <p>Please verify your email address using this 6-digit code:</p>
-                    <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #C49A3C;">${code}</p>
-                    <p>This code will expire in 30 minutes.</p>
-                `,
-            }).catch(err => {
-                console.error("Error sending registration email in background:", err.message);
-            });
+        const user = await User.create({
+            name,
+            email,
+            password,
+            isEmailVerified: true,
+            isPhoneVerified: true
+        });
 
-            res.status(200).json({
-                message: "Verification email sent",
-                userId: user._id,
+        if (user) {
+            res.status(201).json({
+                _id: user._id,
+                name: user.name,
                 email: user.email,
-                code: code
+                isAdmin: user.isAdmin,
+                phone: user.phone,
+                token: generateToken(user._id),
             });
         } else {
             res.status(400).json({ message: "Invalid user data" });
