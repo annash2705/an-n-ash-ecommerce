@@ -46,7 +46,7 @@ function LoginContent() {
     };
 
     return (
-        <div className="bg-cream min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 watercolor-bg">
+        <div className="bg-cream min-h-screen flex flex-col justify-center pt-28 pb-12 sm:px-6 lg:px-8 watercolor-bg">
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
                 <img src="/brand-hero.jpg" alt="An.n.Ash" className="w-24 h-24 mx-auto mb-6 object-contain rounded-xl opacity-90" />
                 <h2 className="text-3xl font-serif text-foreground mb-1">Welcome Back</h2>

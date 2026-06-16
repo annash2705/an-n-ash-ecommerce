@@ -355,7 +355,7 @@ function RegisterContent() {
     };
 
     return (
-        <div className="bg-cream min-h-screen flex flex-col justify-center py-12 sm:px-6 lg:px-8 watercolor-bg">
+        <div className="bg-cream min-h-screen flex flex-col justify-center pt-28 pb-12 sm:px-6 lg:px-8 watercolor-bg">
             <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
                 <img src="/brand-hero.jpg" alt="An.n.Ash" className="w-24 h-24 mx-auto mb-6 object-contain rounded-xl opacity-90" />
                 <h2 className="text-3xl font-serif text-foreground mb-1">Join An.n.Ash</h2>
@@ -395,7 +395,7 @@ function RegisterContent() {
                                         required
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="input-elegant pl-10"
+                                        className="input-elegant !pl-10"
                                         placeholder="Your name"
                                     />
                                 </div>
@@ -409,7 +409,7 @@ function RegisterContent() {
                                         required
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="input-elegant pl-10"
+                                        className="input-elegant !pl-10"
                                         placeholder="you@example.com"
                                     />
                                 </div>
@@ -423,7 +423,7 @@ function RegisterContent() {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="input-elegant pl-10"
+                                        className="input-elegant !pl-10"
                                         placeholder="••••••••"
                                     />
                                 </div>
@@ -437,7 +437,7 @@ function RegisterContent() {
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="input-elegant pl-10"
+                                        className="input-elegant !pl-10"
                                         placeholder="••••••••"
                                     />
                                 </div>
