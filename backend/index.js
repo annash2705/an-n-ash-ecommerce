@@ -21,6 +21,8 @@ const app = express();
 // CORS — support multiple origins
 const allowedOrigins = [
     process.env.FRONTEND_URL,
+    "https://an-n-ash.in",
+    "https://www.an-n-ash.in",
     "http://localhost:3000",
     "http://localhost:3001",
 ].filter(Boolean);
