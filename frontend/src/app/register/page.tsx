@@ -367,9 +367,6 @@ function RegisterContent() {
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="card-premium py-8 px-6 sm:px-10">
                     
-                    {/* Render Step Indicators */}
-                    {renderStepProgress()}
-
                     {/* Feedback Banners */}
                     {error && (
                         <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-5 text-sm border border-red-100 flex items-start gap-2 animate-fade-in-up">
