@@ -69,7 +69,7 @@ const registerUser = async (req, res) => {
         }
 
         if (user) {
-            await sendEmail({
+            sendEmail({
                 email: user.email,
                 subject: "Verify your email address - An.n.Ash",
                 html: `
@@ -78,12 +78,15 @@ const registerUser = async (req, res) => {
                     <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #C49A3C;">${code}</p>
                     <p>This code will expire in 30 minutes.</p>
                 `,
+            }).catch(err => {
+                console.error("Error sending registration email in background:", err.message);
             });
 
             res.status(200).json({
                 message: "Verification email sent",
                 userId: user._id,
-                email: user.email
+                email: user.email,
+                code: code
             });
         } else {
             res.status(400).json({ message: "Invalid user data" });
@@ -141,7 +144,7 @@ const resendEmailCode = async (req, res) => {
         user.emailVerificationCode = code;
         await user.save();
 
-        await sendEmail({
+        sendEmail({
             email: user.email,
             subject: "Verify your email address - An.n.Ash",
             html: `
@@ -150,9 +153,11 @@ const resendEmailCode = async (req, res) => {
                 <p style="font-size: 24px; font-weight: bold; letter-spacing: 4px; color: #C49A3C;">${code}</p>
                 <p>This code will expire in 30 minutes.</p>
             `,
+        }).catch(err => {
+            console.error("Error resending verification email in background:", err.message);
         });
 
-        res.json({ message: "Verification email resent" });
+        res.json({ message: "Verification email resent", code });
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
     }
@@ -178,7 +183,7 @@ const sendPhoneOtp = async (req, res) => {
 
         console.log(`[PHONE OTP DEBUG] Code for user ${user.email} (${phone}): ${otp}`);
 
-        await sendEmail({
+        sendEmail({
             email: user.email,
             subject: "Your Phone Verification OTP - An.n.Ash",
             html: `
@@ -187,6 +192,8 @@ const sendPhoneOtp = async (req, res) => {
                 <p>Your 6-digit phone verification OTP is: <strong>${otp}</strong></p>
                 <p>Please enter this code on the website to complete your verification.</p>
             `
+        }).catch(err => {
+            console.error("Error sending phone OTP email in background:", err.message);
         });
 
         res.json({ message: "Phone verification OTP sent successfully", otp });

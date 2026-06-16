@@ -56,6 +56,7 @@ function RegisterContent() {
     const [resendCooldown, setResendCooldown] = useState(0);
 
     // OTP capture for local testing helper
+    const [receivedEmailOtp, setReceivedEmailOtp] = useState("");
     const [receivedPhoneOtp, setReceivedPhoneOtp] = useState("");
 
     // General UI states
@@ -133,6 +134,9 @@ function RegisterContent() {
             const { data } = await api.post("/users", { name, email, password });
             setUserId(data.userId);
             setEmail(data.email);
+            if (data.code) {
+                setReceivedEmailOtp(data.code);
+            }
             setStep("verify-email");
             syncUrl("verify-email", data.userId, data.email);
         } catch (err: any) {
@@ -170,7 +174,10 @@ function RegisterContent() {
         setError("");
         setSuccessMessage("");
         try {
-            await api.post("/users/resend-email-code", { userId });
+            const { data } = await api.post("/users/resend-email-code", { userId });
+            if (data.code) {
+                setReceivedEmailOtp(data.code);
+            }
             setSuccessMessage("Verification code resent to your email.");
             setResendCooldown(30);
         } catch (err: any) {
@@ -462,6 +469,18 @@ function RegisterContent() {
                                     We have sent a 6-digit verification code to <strong className="text-foreground">{email}</strong>.
                                 </p>
                             </div>
+
+                            {/* Local Testing Helper Alert Box */}
+                            {receivedEmailOtp && (
+                                <div className="bg-gold/10 border border-gold/30 rounded-lg p-3 text-sm text-gold-dark animate-fade-in-up flex items-start gap-2">
+                                    <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                                    <div>
+                                        <p className="font-semibold mb-0.5">Local Testing Helper</p>
+                                        <p>The code is: <strong className="text-base tracking-wider font-bold">{receivedEmailOtp}</strong></p>
+                                        <p className="text-[11px] text-gold-dark/70 mt-0.5">This alert is shown only during development/testing.</p>
+                                    </div>
+                                </div>
+                            )}
 
                             <form onSubmit={handleVerifyEmail} className="space-y-6">
                                 <div className="flex justify-center gap-2.5">
