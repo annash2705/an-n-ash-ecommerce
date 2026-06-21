@@ -169,7 +169,7 @@ function ShopContent() {
                         </div>
 
                         {loading ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                                 {[1, 2, 3, 4, 5, 6].map(i => (
                                     <div key={i} className="card-premium overflow-hidden animate-pulse">
                                         <div className="aspect-[4/5] bg-beige/60" />
@@ -192,7 +192,7 @@ function ShopContent() {
                                 <button onClick={() => { setCategory('All'); setSort('newest'); setSearchKeyword(''); }} className="text-gold hover:text-gold-dark transition-colors underline underline-offset-4">Clear Filters</button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                                 {filteredProducts.map(product => (
                                     <ProductCard key={product._id} product={product} />
                                 ))}

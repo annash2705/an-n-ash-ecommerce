@@ -5,7 +5,7 @@ const Product = require("../models/Product");
 // @access  Public
 const getProducts = async (req, res) => {
     try {
-        const pageSize = Number(req.query.limit) || 20;
+        const pageSize = Number(req.query.limit) || 1000;
         const page = Number(req.query.page) || 1;
 
         const filter = {};

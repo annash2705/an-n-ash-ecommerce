@@ -211,7 +211,7 @@ export default async function Home() {
           </div>
 
           {featuredProducts.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-8">
               {featuredProducts.map((product: any, i: number) => (
                 <Link
                   href={`/product/${product._id}`}
@@ -231,6 +231,12 @@ export default async function Home() {
                       <div className="absolute top-3 left-3 bg-cream/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-semibold text-gold uppercase tracking-[0.1em] border border-gold-light/30">
                         {product.category}
                       </div>
+                      {/* Sold out badge */}
+                      {product.countInStock !== undefined && product.countInStock <= 0 && (
+                        <div className="absolute bottom-3 left-3 bg-red-500/90 text-white backdrop-blur-sm px-3 py-1.5 rounded-lg text-[10px] font-semibold uppercase tracking-wider shadow-sm border border-red-400/20 z-10">
+                          Sold out
+                        </div>
+                      )}
                     </div>
                     <div className="text-center p-5">
                       <h3 className="font-serif text-lg text-foreground group-hover:text-gold transition-colors duration-300 mb-2">{product.name}</h3>
